@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { readFileSync, mkdirSync } from 'fs';
+import { readFileSync, readdirSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -13,7 +13,6 @@ export function createDatabase(path: string) {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
 
-  // Run migrations
   db.exec(`CREATE TABLE IF NOT EXISTS migrations (
     name TEXT PRIMARY KEY,
     applied_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -23,11 +22,15 @@ export function createDatabase(path: string) {
     db.prepare('SELECT name FROM migrations').all().map((r: any) => r.name)
   );
 
-  const migrationFile = '001-initial-schema.sql';
-  if (!applied.has(migrationFile)) {
-    const sql = readFileSync(join(__dirname, 'migrations', migrationFile), 'utf-8');
-    db.exec(sql);
-    db.prepare('INSERT INTO migrations (name) VALUES (?)').run(migrationFile);
+  const migrationsDir = join(__dirname, 'migrations');
+  const files = readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort();
+
+  for (const file of files) {
+    if (!applied.has(file)) {
+      const sql = readFileSync(join(migrationsDir, file), 'utf-8');
+      db.exec(sql);
+      db.prepare('INSERT INTO migrations (name) VALUES (?)').run(file);
+    }
   }
 
   return db;
