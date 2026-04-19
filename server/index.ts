@@ -6,6 +6,7 @@ import { checkinRouter } from './routes/checkin';
 import { assignmentsRouter } from './routes/assignments';
 import { authRouter } from './routes/auth';
 import { SignalService } from './services/signal';
+import { purgeExpiredSessions } from './services/cleanup';
 import { lockRouter } from './routes/lock';
 import { setupWebSocket } from './ws/index';
 
@@ -27,6 +28,8 @@ app.use('/api/sessions', lockRouter(db, signal, broadcast));
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
+
+setInterval(() => purgeExpiredSessions(db), 60 * 60 * 1000); // hourly
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
