@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import AssignmentBoard from './AssignmentBoard';
 import SessionQR from '../components/SessionQR';
 
@@ -8,6 +8,13 @@ export default function SessionPage() {
   const [session, setSession] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [showQR, setShowQR] = useState(false);
+  const [signalConfigured, setSignalConfigured] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/signal/status')
+      .then((r) => r.json())
+      .then((data) => setSignalConfigured(data.status === 'configured'));
+  }, []);
 
   const loadSession = useCallback(() => {
     if (!id) return;
@@ -81,6 +88,11 @@ export default function SessionPage() {
             >
               Lock Assignments
             </button>
+            {!signalConfigured && (
+              <Link to="/settings/signal" className="text-sm text-amber-600 underline">
+                Signal not configured
+              </Link>
+            )}
           </>
         )}
 
