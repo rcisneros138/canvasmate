@@ -6,9 +6,48 @@ export class SignalService {
     private fetchFn: FetchFn = globalThis.fetch
   ) {}
 
-  async createGroup(name: string, members: string[]): Promise<{ link: string | null }> {
+  async register(number: string): Promise<{ ok: boolean; error?: string }> {
     try {
-      const res = await this.fetchFn(`${this.baseUrl}/v2/groups`, {
+      const res = await this.fetchFn(`${this.baseUrl}/v1/register/${number}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ use_voice: false }),
+      });
+      if (!res.ok) return { ok: false, error: await res.text() };
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, error: e.message };
+    }
+  }
+
+  async verify(number: string, code: string): Promise<{ ok: boolean; error?: string }> {
+    try {
+      const res = await this.fetchFn(`${this.baseUrl}/v1/register/${number}/verify/${code}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) return { ok: false, error: await res.text() };
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, error: e.message };
+    }
+  }
+
+  async getAccounts(): Promise<string[]> {
+    try {
+      const res = await this.fetchFn(`${this.baseUrl}/v1/accounts`, {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch {
+      return [];
+    }
+  }
+
+  async createGroup(name: string, members: string[], senderNumber: string): Promise<{ link: string | null }> {
+    try {
+      const res = await this.fetchFn(`${this.baseUrl}/v1/groups/${senderNumber}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

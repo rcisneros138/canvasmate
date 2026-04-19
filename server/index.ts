@@ -6,6 +6,7 @@ import { checkinRouter } from './routes/checkin';
 import { assignmentsRouter } from './routes/assignments';
 import { authRouter } from './routes/auth';
 import { SignalService } from './services/signal';
+import { signalSetupRouter } from './routes/signal-setup';
 import { purgeExpiredSessions } from './services/cleanup';
 import { lockRouter } from './routes/lock';
 import { setupWebSocket } from './ws/index';
@@ -23,6 +24,7 @@ app.use('/api/assignments', assignmentsRouter(db, broadcast));
 app.use('/api/auth', authRouter(db));
 
 const signal = new SignalService(process.env.SIGNAL_API_URL || 'http://localhost:8080');
+app.use('/api/signal', signalSetupRouter(db, signal));
 app.use('/api/sessions', lockRouter(db, signal, broadcast));
 
 app.get('/api/health', (_req, res) => {
