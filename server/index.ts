@@ -4,6 +4,7 @@ import { createDatabase } from './db/index';
 import { sessionsRouter } from './routes/sessions';
 import { checkinRouter } from './routes/checkin';
 import { assignmentsRouter } from './routes/assignments';
+import { authRouter } from './routes/auth';
 import { setupWebSocket } from './ws/index';
 
 const app = express();
@@ -16,6 +17,7 @@ app.use(express.json());
 app.use('/api/sessions', sessionsRouter(db));
 app.use('/api/checkin', checkinRouter(db));
 app.use('/api/assignments', assignmentsRouter(db, broadcast));
+app.use('/api/auth', authRouter(db));
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
