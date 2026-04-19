@@ -53,5 +53,18 @@ export function assignmentsRouter(db: Database.Database, broadcast: (sessionId: 
     res.status(200).json({ groupId, canvasserId, listId });
   });
 
+  router.post('/unassign', (req, res) => {
+    const { sessionId, canvasserId } = req.body;
+
+    db.prepare('UPDATE canvassers SET group_id = NULL WHERE id = ? AND session_id = ?').run(canvasserId, sessionId);
+
+    broadcast(sessionId, {
+      type: 'canvasser_unassigned',
+      canvasserId,
+    });
+
+    res.json({ canvasserId, groupId: null });
+  });
+
   return router;
 }

@@ -1,7 +1,8 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import OrganizerDashboard from './pages/OrganizerDashboard';
 import CreateSession from './pages/CreateSession';
-import CheckIn from './pages/CheckIn';
+import SessionPage from './pages/SessionPage';
+import JoinPage from './pages/JoinPage';
 
 export default function App() {
   return (
@@ -9,8 +10,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<OrganizerDashboard />} />
         <Route path="/session/new" element={<CreateSession />} />
-        <Route path="/session/:id" element={<div>AssignmentBoard (loaded with session data)</div>} />
-        <Route path="/join/:sessionId" element={<CheckIn sessionId="" />} />
+        <Route path="/session/:id" element={<SessionPage />} />
+        <Route path="/join/:sessionId" element={<JoinPage />} />
       </Routes>
     </BrowserRouter>
   );

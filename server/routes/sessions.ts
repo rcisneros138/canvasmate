@@ -46,6 +46,20 @@ export function sessionsRouter(db: Database.Database) {
     res.status(201).json({ id, name, status: 'setup', lists: savedLists });
   });
 
+  router.post('/:id/activate', (req, res) => {
+    const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(req.params.id) as any;
+    if (!session) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+    if (session.status !== 'setup') {
+      res.status(400).json({ error: 'Session can only be activated from setup status' });
+      return;
+    }
+    db.prepare("UPDATE sessions SET status = 'active' WHERE id = ?").run(req.params.id);
+    res.json({ status: 'active' });
+  });
+
   router.get('/:id', (req, res) => {
     const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(req.params.id);
     if (!session) {
@@ -56,8 +70,11 @@ export function sessionsRouter(db: Database.Database) {
     const lists = db.prepare('SELECT * FROM lists WHERE session_id = ?').all(req.params.id);
     const groups = db.prepare('SELECT * FROM groups WHERE session_id = ?').all(req.params.id);
     const canvassers = db.prepare('SELECT * FROM canvassers WHERE session_id = ?').all(req.params.id);
+    const groupLists = db.prepare(
+      'SELECT gl.* FROM group_lists gl JOIN groups g ON gl.group_id = g.id WHERE g.session_id = ?'
+    ).all(req.params.id);
 
-    res.json({ ...(session as any), lists, groups, canvassers });
+    res.json({ ...(session as any), lists, groups, canvassers, groupLists });
   });
 
   return router;
