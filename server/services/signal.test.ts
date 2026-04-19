@@ -9,11 +9,11 @@ describe('SignalService', () => {
     });
 
     const signal = new SignalService('http://localhost:8080', mockFetch as any);
-    const result = await signal.createGroup('Sat W5 - Team A', ['+15551111111', '+15552222222']);
+    const result = await signal.createGroup('Sat W5 - Team A', ['+15551111111', '+15552222222'], '+15559999999');
 
     expect(result.link).toBe('https://signal.group/#abc123');
     expect(mockFetch).toHaveBeenCalledWith(
-      'http://localhost:8080/v2/groups',
+      'http://localhost:8080/v1/groups/+15559999999',
       expect.objectContaining({ method: 'POST' })
     );
   });
@@ -21,8 +21,32 @@ describe('SignalService', () => {
   it('returns null link when Signal API is unavailable', async () => {
     const mockFetch = vi.fn().mockRejectedValue(new Error('Connection refused'));
     const signal = new SignalService('http://localhost:8080', mockFetch as any);
-    const result = await signal.createGroup('Test', ['+15551111111']);
+    const result = await signal.createGroup('Test', ['+15551111111'], '+15559999999');
 
     expect(result.link).toBeNull();
+  });
+
+  it('registers a phone number', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+    const signal = new SignalService('http://localhost:8080', mockFetch as any);
+    const result = await signal.register('+15551234567');
+
+    expect(result.ok).toBe(true);
+    expect(mockFetch).toHaveBeenCalledWith(
+      'http://localhost:8080/v1/register/+15551234567',
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it('verifies a phone number', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+    const signal = new SignalService('http://localhost:8080', mockFetch as any);
+    const result = await signal.verify('+15551234567', '123-456');
+
+    expect(result.ok).toBe(true);
+    expect(mockFetch).toHaveBeenCalledWith(
+      'http://localhost:8080/v1/register/+15551234567/verify/123-456',
+      expect.objectContaining({ method: 'POST' })
+    );
   });
 });
