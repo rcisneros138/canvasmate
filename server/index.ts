@@ -3,11 +3,13 @@ import { createServer } from 'http';
 import { createDatabase } from './db/index';
 import { sessionsRouter } from './routes/sessions';
 import { checkinRouter } from './routes/checkin';
+import { setupWebSocket } from './ws/index';
 
 const app = express();
 const server = createServer(app);
 
 const db = createDatabase('./data/canvasmate.db');
+const { broadcast } = setupWebSocket(server);
 
 app.use(express.json());
 app.use('/api/sessions', sessionsRouter(db));
