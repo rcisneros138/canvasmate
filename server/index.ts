@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import { createDatabase } from './db/index';
 import { sessionsRouter } from './routes/sessions';
 import { checkinRouter } from './routes/checkin';
+import { assignmentsRouter } from './routes/assignments';
 import { setupWebSocket } from './ws/index';
 
 const app = express();
@@ -14,6 +15,7 @@ const { broadcast } = setupWebSocket(server);
 app.use(express.json());
 app.use('/api/sessions', sessionsRouter(db));
 app.use('/api/checkin', checkinRouter(db));
+app.use('/api/assignments', assignmentsRouter(db, broadcast));
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
