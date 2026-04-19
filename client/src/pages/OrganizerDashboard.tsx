@@ -10,6 +10,12 @@ export default function OrganizerDashboard() {
       >
         New Canvass Session
       </Link>
+      <Link
+        to="/settings/signal"
+        className="inline-block px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium"
+      >
+        Signal Settings
+      </Link>
     </div>
   );
 }
