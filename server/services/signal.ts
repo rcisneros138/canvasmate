@@ -45,7 +45,7 @@ export class SignalService {
     }
   }
 
-  async createGroup(name: string, members: string[], senderNumber: string): Promise<{ link: string | null }> {
+  async createGroup(name: string, senderNumber: string, members: string[] = []): Promise<{ link: string | null }> {
     try {
       const res = await this.fetchFn(`${this.baseUrl}/v1/groups/${senderNumber}`, {
         method: 'POST',
@@ -53,7 +53,7 @@ export class SignalService {
         body: JSON.stringify({
           name,
           members,
-          permissions: { addMembers: 'only-admins', editGroup: 'only-admins' },
+          permissions: { addMembers: 'everyone', editGroup: 'only-admins' },
           groupLinkState: 'enabled',
         }),
       });

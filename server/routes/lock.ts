@@ -18,26 +18,20 @@ export function lockRouter(
     const senderNumber = signalRow?.value;
 
     if (senderNumber) {
-      // Create Signal groups per group
       const groups = db.prepare('SELECT * FROM groups WHERE session_id = ?').all(sessionId) as any[];
       const session = db.prepare('SELECT name FROM sessions WHERE id = ?').get(sessionId) as any;
 
       for (const group of groups) {
-        const members = db.prepare(
-          'SELECT phone FROM canvassers WHERE group_id = ? AND phone IS NOT NULL'
-        ).all(group.id) as any[];
-
-        const phones = members.map((m: any) => m.phone).filter(Boolean);
-        if (phones.length === 0) continue;
-
-        const result = await signal.createGroup(`${session.name} - ${group.name}`, phones, senderNumber);
+        const result = await signal.createGroup(`${session.name} - ${group.name}`, senderNumber);
         if (result.link) {
           db.prepare('UPDATE groups SET signal_group_link = ? WHERE id = ?').run(result.link, group.id);
         }
       }
     }
 
-    broadcast(sessionId, { type: 'session_locked' });
+    // Include updated groups in broadcast
+    const updatedGroups = db.prepare('SELECT * FROM groups WHERE session_id = ?').all(sessionId);
+    broadcast(sessionId, { type: 'session_locked', groups: updatedGroups });
     res.json({ status: 'locked' });
   });
 
