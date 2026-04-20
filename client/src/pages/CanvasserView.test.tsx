@@ -23,4 +23,22 @@ describe('CanvasserView', () => {
     expect(screen.getByText('4821093')).toBeDefined();
     expect(screen.getByText('Team A')).toBeDefined();
   });
+
+  it('shows Signal QR code when signal link is present', () => {
+    render(
+      <CanvasserView
+        sessionId="test"
+        sessionToken="tok"
+        assignment={{
+          listNumber: '4821093',
+          groupName: 'Team A',
+          members: ['Alice', 'Bob'],
+          signalLink: 'https://signal.group/#abc123',
+        }}
+      />
+    );
+    expect(screen.getByText('Join Signal Group')).toBeDefined();
+    const svg = document.querySelector('svg');
+    expect(svg).toBeDefined();
+  });
 });

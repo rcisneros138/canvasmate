@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useWebSocket } from '../hooks/useWebSocket';
 
 interface Assignment {
@@ -61,12 +62,16 @@ export default function CanvasserView({ sessionId, sessionToken, assignment: ini
       </div>
 
       {assignment.signalLink && (
-        <a
-          href={assignment.signalLink}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg font-bold"
-        >
-          Join Signal Group
-        </a>
+        <div className="flex flex-col items-center space-y-3">
+          <QRCodeSVG value={assignment.signalLink} size={200} level="M" />
+          <a
+            href={assignment.signalLink}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-bold"
+          >
+            Join Signal Group
+          </a>
+          <p className="text-xs text-gray-400">Scan QR code or tap the button</p>
+        </div>
       )}
     </div>
   );
