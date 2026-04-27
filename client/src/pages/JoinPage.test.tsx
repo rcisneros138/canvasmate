@@ -19,7 +19,7 @@ class MockWebSocket {
   emit(data: any) { this.onmessage?.({ data: JSON.stringify(data) }); }
 }
 
-const TRIGGER_EVENTS = ['group_created', 'solo_assigned', 'canvasser_unassigned', 'session_locked'] as const;
+const TRIGGER_EVENTS = ['group_created', 'solo_assigned', 'canvasser_unassigned', 'session_locked', 'group_lead_set'] as const;
 
 describe('JoinPage WebSocket integration', () => {
   beforeEach(() => {

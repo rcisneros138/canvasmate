@@ -52,7 +52,8 @@ export default function JoinPage({ __testToken }: Props = {}) {
       msg.type === 'group_created' ||
       msg.type === 'solo_assigned' ||
       msg.type === 'canvasser_unassigned' ||
-      msg.type === 'session_locked'
+      msg.type === 'session_locked' ||
+      msg.type === 'group_lead_set'
     ) {
       refetch();
     }
