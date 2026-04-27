@@ -47,20 +47,42 @@ export class SignalService {
 
   async createGroup(name: string, senderNumber: string, members: string[] = []): Promise<{ link: string | null }> {
     try {
+      // Per bbernhard/signal-cli-rest-api swagger (src/docs/swagger.yaml):
+      // - permissions uses snake_case: add_members / edit_group
+      // - add_members enum: only-admins | every-member  (NOT 'everyone')
+      // - group_link enum: disabled | enabled | enabled-with-approval
+      // - CreateGroupResponse only returns { id }; the invite_link must be
+      //   fetched via GET /v1/groups/{number}/{groupid}.
       const res = await this.fetchFn(`${this.baseUrl}/v1/groups/${senderNumber}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
           members,
-          permissions: { addMembers: 'everyone', editGroup: 'only-admins' },
-          groupLinkState: 'enabled',
+          permissions: { add_members: 'every-member', edit_group: 'only-admins' },
+          group_link: 'enabled',
         }),
       });
 
       if (!res.ok) return { link: null };
       const data = await res.json();
-      return { link: data.link || null };
+
+      // Robust extraction: some bridge versions / forks may return the link
+      // directly on the create response. Prefer those if present.
+      const directLink = data.invite_link || data.groupInviteLink || data.link;
+      if (directLink) return { link: directLink };
+
+      // Standard path: follow up with GET to retrieve invite_link.
+      const groupId = data.id;
+      if (!groupId) return { link: null };
+
+      const detailsRes = await this.fetchFn(
+        `${this.baseUrl}/v1/groups/${senderNumber}/${encodeURIComponent(groupId)}`,
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+      if (!detailsRes.ok) return { link: null };
+      const details = await detailsRes.json();
+      return { link: details.invite_link || details.groupInviteLink || details.link || null };
     } catch {
       return { link: null };
     }

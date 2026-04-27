@@ -17,7 +17,13 @@ services:
     volumes:
       - signal-data:/home/.local/share/signal-cli
     environment:
-      - MODE=json-rpc
+      # 'normal' is the bbernhard default and the mode shown in the upstream
+      # README example. It supports the full HTTP surface including
+      # /v1/register/{number}. 'json-rpc' optimizes messaging throughput but
+      # has caused registration issues in the wild — see
+      # docs/runbooks/signal-smoke-test.md Section 9 for the swap procedure
+      # if you want to opt into json-rpc after registration succeeds.
+      - MODE=normal
 
 volumes:
   canvasmate-data:
