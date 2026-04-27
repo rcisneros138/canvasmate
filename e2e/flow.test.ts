@@ -1,16 +1,16 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, inject } from 'vitest';
 
-const BASE = process.env.BASE_URL || 'http://localhost:3000';
+const BASE = inject('baseUrl');
+if (!BASE) throw new Error('BASE_URL must be set (globalSetup should set it)');
 
 /**
  * End-to-end integration test for the full canvass flow.
  *
- * Prerequisites:
- *   1. Start the server: npm run dev:server
- *   2. Run: npx vitest run --config e2e/vitest.config.ts
+ * The Express app is booted in-process by `e2e/globalSetup.ts`,
+ * which exposes the listening URL via `inject('baseUrl')`. No
+ * separate `npm run dev:server` is required.
  *
- * These tests hit a live server — they are NOT run as part of
- * the normal `npm test` suite.
+ * Run: `npm run test:e2e`
  */
 describe('full canvass flow', () => {
   it('creates session, fetches it, and locks it', async () => {
