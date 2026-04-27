@@ -40,7 +40,6 @@ function buildCanvasserListMap(
 export default function AssignmentBoard({ session: initial }: Props) {
   const [canvassers, setCanvassers] = useState(initial.canvassers);
   const [groups, setGroups] = useState(initial.groups);
-  const [, setGroupLists] = useState(initial.groupLists || []);
   // canvasserId -> listId
   const [assignments, setAssignments] = useState<Map<number, number>>(
     () => buildCanvasserListMap(initial.canvassers, initial.groupLists || [])
@@ -56,10 +55,6 @@ export default function AssignmentBoard({ session: initial }: Props) {
         prev.map((c) => (c.id === data.canvasserId ? { ...c, group_id: data.groupId } : c))
       );
       if (data.groupId != null && data.listId != null) {
-        setGroupLists((prev) => {
-          if (prev.some((gl) => gl.group_id === data.groupId)) return prev;
-          return [...prev, { group_id: data.groupId, list_id: data.listId }];
-        });
         setGroups((prev) => {
           if (prev.some((g) => g.id === data.groupId)) return prev;
           return [...prev, { id: data.groupId, name: 'Solo', group_lead_canvasser_id: null }];

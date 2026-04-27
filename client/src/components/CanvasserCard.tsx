@@ -16,11 +16,14 @@ export default function CanvasserCard({ id, name, isLead, groupId, sessionId }: 
   async function handleMakeLead(e: React.MouseEvent) {
     e.stopPropagation();
     if (groupId == null || !sessionId) return;
-    await fetch(`/api/assignments/groups/${groupId}/lead`, {
+    const res = await fetch(`/api/assignments/groups/${groupId}/lead`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId, canvasserId: id }),
     });
+    if (!res.ok) {
+      console.error(`Failed to set group lead: ${res.status} ${await res.text()}`);
+    }
   }
 
   return (
