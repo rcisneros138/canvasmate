@@ -1,6 +1,4 @@
-import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { useWebSocket } from '../hooks/useWebSocket';
 
 interface Assignment {
   listNumber: string;
@@ -10,23 +8,10 @@ interface Assignment {
 }
 
 interface Props {
-  sessionId: string;
-  sessionToken: string;
   assignment: Assignment | null;
 }
 
-export default function CanvasserView({ sessionId, sessionToken, assignment: initial }: Props) {
-  const [assignment, setAssignment] = useState(initial);
-
-  useWebSocket(sessionId, (data) => {
-    if (data.type === 'assigned' && data.sessionToken === sessionToken) {
-      setAssignment(data.assignment);
-    }
-    if (data.type === 'signal_group_created' && data.sessionToken === sessionToken) {
-      setAssignment((prev) => prev ? { ...prev, signalLink: data.signalLink } : prev);
-    }
-  });
-
+export default function CanvasserView({ assignment }: Props) {
   if (!assignment) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">

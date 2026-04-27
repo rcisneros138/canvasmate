@@ -69,14 +69,5 @@ export default function JoinPage({ __testToken }: Props = {}) {
     return <CheckIn sessionId={sessionId} onCheckedIn={(token) => setSessionToken(token)} />;
   }
 
-  return (
-    <CanvasserView
-      // Remount when an assignment first arrives so CanvasserView's internal
-      // state picks up the new prop (it only reads `assignment` on mount).
-      key={assignment ? 'assigned' : 'waiting'}
-      sessionId={sessionId}
-      sessionToken={sessionToken}
-      assignment={assignment}
-    />
-  );
+  return <CanvasserView assignment={assignment} />;
 }

@@ -51,12 +51,10 @@ describe('JoinPage WebSocket integration', () => {
       </MemoryRouter>
     );
 
-    await waitFor(() => expect(MockWebSocket.instances.length).toBeGreaterThanOrEqual(1));
+    await waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
 
     await act(async () => {
-      // Broadcast to every connected hook so JoinPage's listener receives the event
-      // regardless of which sub-component also subscribes via useWebSocket.
-      MockWebSocket.instances.forEach((ws) => ws.emit({ type: 'group_created' }));
+      MockWebSocket.instances[0].emit({ type: 'group_created' });
     });
 
     await waitFor(() => {
