@@ -66,5 +66,23 @@ export function assignmentsRouter(db: Database.Database, broadcast: (sessionId: 
     res.json({ canvasserId, groupId: null });
   });
 
+  router.post('/groups/:id/lead', (req, res) => {
+    const groupId = Number(req.params.id);
+    const { sessionId, canvasserId } = req.body;
+
+    const canvasser = db.prepare(
+      'SELECT group_id FROM canvassers WHERE id = ? AND session_id = ?'
+    ).get(canvasserId, sessionId) as any;
+
+    if (!canvasser || canvasser.group_id !== groupId) {
+      res.status(400).json({ error: 'Canvasser is not in this group' });
+      return;
+    }
+
+    db.prepare('UPDATE groups SET group_lead_canvasser_id = ? WHERE id = ?').run(canvasserId, groupId);
+    broadcast(sessionId, { type: 'group_lead_set', groupId, canvasserId });
+    res.json({ groupId, canvasserId });
+  });
+
   return router;
 }
