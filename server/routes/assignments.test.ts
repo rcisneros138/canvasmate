@@ -103,5 +103,24 @@ describe('POST /api/assignments/groups/:id/lead', () => {
       .send({ sessionId: 's1', canvasserId: otherId });
 
     expect(res.status).toBe(400);
+    expect(broadcastMock).not.toHaveBeenCalled();
+    const stored = db.prepare('SELECT group_lead_canvasser_id FROM groups WHERE id = ?').get(groupId) as any;
+    expect(stored.group_lead_canvasser_id).toBeNull();
+  });
+
+  it('returns 404 when group does not exist in session', async () => {
+    db.prepare("INSERT INTO sessions (id, name, organizer_id, status, expires_at) VALUES ('s1','S','o1','active',datetime('now','+1 day'))").run();
+    db.prepare("INSERT INTO sessions (id, name, organizer_id, status, expires_at) VALUES ('s2','S2','o1','active',datetime('now','+1 day'))").run();
+    // Group belongs to s2, but request claims sessionId s1
+    const groupId = (db.prepare("INSERT INTO groups (session_id, name) VALUES ('s2','A')").run() as any).lastInsertRowid;
+    // Canvasser in s1 with matching group_id (simulates a numeric collision)
+    const canvasserId = (db.prepare("INSERT INTO canvassers (session_id, display_name, group_id, session_token) VALUES ('s1','Alice',?,?)").run(groupId, 'tok')).lastInsertRowid;
+
+    const res = await request(app)
+      .post(`/api/assignments/groups/${groupId}/lead`)
+      .send({ sessionId: 's1', canvasserId });
+
+    expect(res.status).toBe(404);
+    expect(broadcastMock).not.toHaveBeenCalled();
   });
 });

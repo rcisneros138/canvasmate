@@ -79,7 +79,15 @@ export function assignmentsRouter(db: Database.Database, broadcast: (sessionId: 
       return;
     }
 
-    db.prepare('UPDATE groups SET group_lead_canvasser_id = ? WHERE id = ?').run(canvasserId, groupId);
+    const result = db.prepare(
+      'UPDATE groups SET group_lead_canvasser_id = ? WHERE id = ? AND session_id = ?'
+    ).run(canvasserId, groupId, sessionId);
+
+    if (result.changes === 0) {
+      res.status(404).json({ error: 'Group not found in this session' });
+      return;
+    }
+
     broadcast(sessionId, { type: 'group_lead_set', groupId, canvasserId });
     res.json({ groupId, canvasserId });
   });
