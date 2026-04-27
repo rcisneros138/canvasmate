@@ -8,7 +8,7 @@ interface Session {
   id: string;
   name: string;
   lists: { id: number; list_number: string; label?: string }[];
-  groups: { id: number; name: string }[];
+  groups: { id: number; name: string; group_lead_canvasser_id?: number | null }[];
   canvassers: { id: number; display_name: string; group_id: number | null }[];
   groupLists: { group_id: number; list_id: number }[];
 }
@@ -39,7 +39,8 @@ function buildCanvasserListMap(
 
 export default function AssignmentBoard({ session: initial }: Props) {
   const [canvassers, setCanvassers] = useState(initial.canvassers);
-  const [groupLists, setGroupLists] = useState(initial.groupLists || []);
+  const [groups, setGroups] = useState(initial.groups);
+  const [, setGroupLists] = useState(initial.groupLists || []);
   // canvasserId -> listId
   const [assignments, setAssignments] = useState<Map<number, number>>(
     () => buildCanvasserListMap(initial.canvassers, initial.groupLists || [])
@@ -49,6 +50,46 @@ export default function AssignmentBoard({ session: initial }: Props) {
   const onMessage = useCallback((data: any) => {
     if (data.type === 'canvasser_joined') {
       setCanvassers((prev) => [...prev, data.canvasser]);
+    }
+    if (data.type === 'solo_assigned') {
+      setCanvassers((prev) =>
+        prev.map((c) => (c.id === data.canvasserId ? { ...c, group_id: data.groupId } : c))
+      );
+      if (data.groupId != null && data.listId != null) {
+        setGroupLists((prev) => {
+          if (prev.some((gl) => gl.group_id === data.groupId)) return prev;
+          return [...prev, { group_id: data.groupId, list_id: data.listId }];
+        });
+        setGroups((prev) => {
+          if (prev.some((g) => g.id === data.groupId)) return prev;
+          return [...prev, { id: data.groupId, name: 'Solo', group_lead_canvasser_id: null }];
+        });
+      }
+    }
+    if (data.type === 'canvasser_unassigned') {
+      setCanvassers((prev) =>
+        prev.map((c) => (c.id === data.canvasserId ? { ...c, group_id: null } : c))
+      );
+    }
+    if (data.type === 'group_created') {
+      const ids: number[] = data.group?.canvasserIds ?? [];
+      setCanvassers((prev) =>
+        prev.map((c) => (ids.includes(c.id) ? { ...c, group_id: data.group.id } : c))
+      );
+      setGroups((prev) => {
+        if (prev.some((g) => g.id === data.group.id)) return prev;
+        return [
+          ...prev,
+          { id: data.group.id, name: data.group.name, group_lead_canvasser_id: null },
+        ];
+      });
+    }
+    if (data.type === 'group_lead_set') {
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.id === data.groupId ? { ...g, group_lead_canvasser_id: data.canvasserId } : g
+        )
+      );
     }
   }, []);
 
@@ -99,6 +140,21 @@ export default function AssignmentBoard({ session: initial }: Props) {
 
   const draggingCanvasser = draggingId ? canvassers.find((c) => c.id === draggingId) : null;
 
+  function renderCard(c: Session['canvassers'][number]) {
+    const group = c.group_id != null ? groups.find((g) => g.id === c.group_id) : undefined;
+    const isLead = !!group && group.group_lead_canvasser_id === c.id;
+    return (
+      <CanvasserCard
+        key={c.id}
+        id={c.id}
+        name={c.display_name}
+        isLead={isLead}
+        groupId={c.group_id}
+        sessionId={initial.id}
+      />
+    );
+  }
+
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="min-h-screen p-6">
@@ -107,9 +163,7 @@ export default function AssignmentBoard({ session: initial }: Props) {
         <div className="flex gap-6">
           {/* Unassigned column — droppable */}
           <GroupColumn id="unassigned" listNumber="Unassigned" label={`${unassigned.length} canvassers`}>
-            {unassigned.map((c) => (
-              <CanvasserCard key={c.id} id={c.id} name={c.display_name} />
-            ))}
+            {unassigned.map(renderCard)}
           </GroupColumn>
 
           {/* List columns */}
@@ -123,9 +177,7 @@ export default function AssignmentBoard({ session: initial }: Props) {
                   listNumber={list.list_number}
                   label={list.label}
                 >
-                  {assigned.map((c) => (
-                    <CanvasserCard key={c.id} id={c.id} name={c.display_name} />
-                  ))}
+                  {assigned.map(renderCard)}
                 </GroupColumn>
               );
             })}
