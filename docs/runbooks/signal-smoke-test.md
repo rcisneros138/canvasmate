@@ -108,8 +108,16 @@ curl "http://localhost:8080/v1/groups/+15551234567" | jq
 ```
 
 Expected: a JSON array with two entries (`Smoke Test - 101`, `Smoke Test - 102`)
-each carrying a non-null invite link. The bridge typically reports it as
-`groupInviteLink`; some versions use `link` or `invite_link` (see section 9).
+each carrying a non-null invite link. The current bbernhard swagger spec uses
+`invite_link`; `groupInviteLink` and `link` are retained as legacy fallbacks
+in `signal.ts` (see section 9).
+
+To inspect a single group directly (mirrors what the code does after
+`createGroup` returns an id):
+
+```bash
+curl "http://localhost:8080/v1/groups/+15551234567/<groupId>" | jq .invite_link
+```
 
 Confirm the link round-tripped into the app DB:
 
@@ -120,9 +128,13 @@ docker compose exec app sqlite3 /app/data/canvasmate.db \
 # 102|https://signal.group/#CjQK...
 ```
 
-Both rows must have a non-null `signal_group_link`. A null means the bridge
-call succeeded but the response shape did not match what
-`server/services/signal.ts:createGroup` expects (`data.link`).
+Both rows must have a non-null `signal_group_link`. `signal.ts:createGroup`
+first checks the POST response for `invite_link || groupInviteLink || link`,
+and if none are present, follows up with `GET /v1/groups/{number}/{groupId}`
+and reads the same fallback chain off the details payload. A null in the DB
+after lock is therefore most likely a real bridge bug (group created without a
+link, or detail endpoint returning an unexpected shape) rather than a
+field-name mismatch.
 
 ## 7. Verify QR codes for canvassers
 
@@ -171,10 +183,11 @@ The verify code can still be entered through the UI afterwards.
 ### `register` returns `400` / no SMS / `Missing endpoint`
 
 **Symptom:** the bridge accepts the request but signal-cli never sends SMS;
-logs mention RPC errors.
-**Fix:** `docker-compose.yml` sets `MODE=json-rpc`. Some bbernhard image
-versions only expose registration endpoints in `MODE=normal` (or `native`).
-Edit the compose file:
+logs mention RPC errors or "endpoint not available in this mode".
+**Fix:** `docker-compose.yml` now defaults to `MODE=normal` per the bbernhard
+swagger spec, which is what registration expects. If you previously switched
+to `MODE=json-rpc` to enable messaging features and registration broke,
+revert to `MODE=normal` for the registration flow:
 
 ```yaml
   signal:
@@ -189,21 +202,28 @@ mode/endpoint compatibility.
 
 **Symptom:** lock succeeds, but `signal_group_link` is null in the DB even
 though `GET /v1/groups/{senderNumber}` shows the group.
-**Fix:** the response shape from the bridge varies.
-`server/services/signal.ts` reads `data.link`; some versions emit
-`groupInviteLink`. Probe the raw response:
+**Fix:** `signal.ts:createGroup` already matches the current swagger payload
+shape and follows the create POST with a GET to read `invite_link`. A null
+link at runtime is therefore most likely a real bridge bug (group created
+without a link enabled, or version drift in the response field names).
+Probe the raw response:
 
 ```bash
 curl -X POST "http://localhost:8080/v1/groups/+15551234567" \
   -H "Content-Type: application/json" \
-  -d '{"name":"shape-probe","members":[],"permissions":{"addMembers":"everyone","editGroup":"only-admins"},"groupLinkState":"enabled"}' | jq
+  -d '{
+    "name": "shape-probe",
+    "members": [],
+    "permissions": { "add_members": "every-member", "edit_group": "only-admins" },
+    "group_link": "enabled"
+  }' | jq
 ```
 
-If the field is `groupInviteLink`, file an issue and patch
-`signal.ts:createGroup`. Also note: the code passes
-`permissions.addMembers: 'everyone'`; some signal-cli builds expect
-`'every-member'` and reject `'everyone'`. If the POST itself returns non-2xx
-with a permissions error, swap the value and retry.
+If the POST returns only `{ "id": "..." }`, follow up with
+`curl "http://localhost:8080/v1/groups/+15551234567/<id>" | jq` and confirm
+`invite_link` is populated. If the bridge emits a link under some other
+field name, file an issue and extend the fallback chain in
+`signal.ts:createGroup` (currently `invite_link || groupInviteLink || link`).
 
 ### QR scan does not open Signal
 
