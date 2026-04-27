@@ -42,4 +42,9 @@ describe('database', () => {
     ).all();
     expect(tables).toHaveLength(1);
   });
+
+  it('groups have a group_lead_canvasser_id column', () => {
+    const cols = db.prepare("PRAGMA table_info(groups)").all() as any[];
+    expect(cols.some(c => c.name === 'group_lead_canvasser_id')).toBe(true);
+  });
 });
