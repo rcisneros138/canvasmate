@@ -1,5 +1,5 @@
-import { buildApp } from './app';
-import { purgeExpiredSessions } from './services/cleanup';
+import { buildApp } from './app.js';
+import { purgeExpiredSessions } from './services/cleanup.js';
 
 const { server, db } = buildApp({
   dbPath: './data/canvasmate.db',

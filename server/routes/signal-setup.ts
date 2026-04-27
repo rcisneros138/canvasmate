@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import Database from 'better-sqlite3';
-import { SignalService } from '../services/signal';
+import { SignalService } from '../services/signal.js';
 
 export function signalSetupRouter(db: Database.Database, signal: SignalService) {
   const router = Router();
