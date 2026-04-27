@@ -1,6 +1,7 @@
 import express from 'express';
 import { createServer } from 'http';
 import Database from 'better-sqlite3';
+import type { WebSocketServer } from 'ws';
 import { createDatabase } from './db/index';
 import { sessionsRouter } from './routes/sessions';
 import { checkinRouter } from './routes/checkin';
@@ -17,13 +18,14 @@ export interface AppContext {
   db: Database.Database;
   signal: SignalService;
   broadcast: (sessionId: string, data: any) => void;
+  wss: WebSocketServer;
 }
 
 export function buildApp(opts: { dbPath: string; signalApiUrl: string }): AppContext {
   const app = express();
   const server = createServer(app);
   const db = createDatabase(opts.dbPath);
-  const { broadcast } = setupWebSocket(server);
+  const { broadcast, wss } = setupWebSocket(server);
   const signal = new SignalService(opts.signalApiUrl);
 
   app.use(express.json());
@@ -37,5 +39,5 @@ export function buildApp(opts: { dbPath: string; signalApiUrl: string }): AppCon
     res.json({ status: 'ok' });
   });
 
-  return { app, server, db, signal, broadcast };
+  return { app, server, db, signal, broadcast, wss };
 }

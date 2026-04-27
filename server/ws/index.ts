@@ -37,5 +37,5 @@ export function setupWebSocket(server: Server) {
     }
   }
 
-  return { broadcast };
+  return { broadcast, wss };
 }

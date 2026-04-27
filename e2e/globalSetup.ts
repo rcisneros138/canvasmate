@@ -9,17 +9,18 @@ export async function setup({ provide }: GlobalSetupContext) {
     dbPath: ':memory:',
     signalApiUrl: 'http://localhost:9999', // unreachable; tests don't need real Signal
   });
-  await new Promise<void>((resolve) => {
+  await new Promise<void>((resolve, reject) => {
+    ctx!.server.once('error', reject);
     ctx!.server.listen(0, () => resolve());
   });
   const port = (ctx!.server.address() as AddressInfo).port;
   const baseUrl = `http://127.0.0.1:${port}`;
-  process.env.BASE_URL = baseUrl;
   provide('baseUrl', baseUrl);
 }
 
 export async function teardown() {
   if (!ctx) return;
+  ctx.wss.close();
   await new Promise<void>((resolve) => ctx!.server.close(() => resolve()));
   ctx.db.close();
 }
