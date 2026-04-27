@@ -5,6 +5,7 @@ interface Assignment {
   groupName: string;
   members: string[];
   signalLink?: string;
+  isLead?: boolean;
 }
 
 interface Props {
@@ -38,7 +39,14 @@ export default function CanvasserView({ assignment }: Props) {
       </div>
 
       <div className="text-center">
-        <p className="font-bold text-lg">{assignment.groupName}</p>
+        <p className="font-bold text-lg">
+          {assignment.groupName}
+          {assignment.isLead && (
+            <span className="inline-block ml-2 px-2 py-0.5 text-xs bg-amber-100 text-amber-800 rounded-full">
+              Group lead
+            </span>
+          )}
+        </p>
         <div className="mt-2 space-y-1">
           {assignment.members.map((m) => (
             <p key={m} className="text-gray-600">{m}</p>

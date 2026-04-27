@@ -18,6 +18,15 @@ describe('CanvasserView', () => {
     expect(screen.getByText('Team A')).toBeDefined();
   });
 
+  it('shows "Group lead" badge when isLead is true', () => {
+    render(
+      <CanvasserView
+        assignment={{ listNumber: '1', groupName: 'A', members: ['Alice'], isLead: true }}
+      />
+    );
+    expect(screen.getByText(/group lead/i)).toBeDefined();
+  });
+
   it('shows Signal QR code when signal link is present', () => {
     render(
       <CanvasserView

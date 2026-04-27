@@ -38,6 +38,7 @@ export default function JoinPage({ __testToken }: Props = {}) {
       groupName: group.name,
       members,
       signalLink: group.signal_group_link || undefined,
+      isLead: group.group_lead_canvasser_id === canvasser.id,
     });
   }, [sessionToken, sessionId]);
 
