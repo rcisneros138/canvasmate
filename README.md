@@ -87,6 +87,16 @@ npm run test:e2e
 | Signal      | [bbernhard/signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api) sidecar |
 | Packaging   | Single Docker image + Compose stack              |
 
+## About the Signal integration
+
+CanvasMate's Signal feature is asymmetric: canvassers do nothing special, but the organizer running the instance has to set up a dedicated bot identity once.
+
+- **Canvassers.** Use Signal normally on their own phones. They scan a QR code (or tap a link) on the canvasser view to join the per-group chat. There is nothing to register, install, or configure on their personal account.
+- **Organizer.** Registers one phone number with the bundled `signal-cli-rest-api` sidecar. That number becomes the bot identity for the whole CanvasMate deployment and is what creates the per-group Signal groups every time a session is locked. Register once, use forever — there is no per-session Signal step.
+- **Do not use your personal cell.** Signal allows only one active registration per number. Registering your own number with the bridge will sign you out of Signal on your phone, and signing back in later resets safety numbers for every contact you have and may erase message history. Use a separate number.
+- **Recommended: a cheap prepaid SIM** (~$15) in a spare phone or USB modem. An organizational landline that can receive SMS, an org-issued mobile line, or Google Voice (US only, sometimes blocked by Signal as VoIP) also work. The deploy guide has a full ranked list: see [`docs/deploy.md`](docs/deploy.md#3-choosing-a-signal-number-for-the-bot).
+- **Tell canvassers the number ahead of time** so an incoming Signal-group invite from an unknown sender is not mistaken for spam.
+
 ## Privacy and data handling
 
 CanvasMate handles canvasser PII (display names, optional phone numbers, optional MiniVAN IDs) and is built to forget it quickly.

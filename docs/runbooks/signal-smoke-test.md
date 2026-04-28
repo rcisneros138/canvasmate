@@ -14,7 +14,9 @@ outputs so the result is reproducible.
     Re-registering a number that already has Signal **invalidates the existing
     account**: messages, contacts, and groups on the old install are detached.
     Do not use your personal number. Do not use a colleague's number.
-  - Twilio, JMP.chat, or a prepaid SIM all work.
+  - For ranked options (prepaid SIM, org-issued line, Google Voice, etc.), see
+    [Choosing a Signal number for the bot](../deploy.md#3-choosing-a-signal-number-for-the-bot)
+    in the deploy guide.
 - Working Docker stack per [`docs/deploy.md`](../deploy.md): Docker Engine 24+,
   Compose v2, ports `3000` and `8080` free.
 - A real phone with the Signal app installed for the QR scan in step 7
