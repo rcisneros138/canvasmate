@@ -1,26 +1,39 @@
 import { QRCodeSVG } from 'qrcode.react';
 
-interface Assignment {
+export interface Assignment {
   listNumber: string;
   groupName: string;
   members: string[];
-  signalLink?: string;
   isLead?: boolean;
 }
 
 interface Props {
   assignment: Assignment | null;
+  signalLink?: string;
 }
 
-export default function CanvasserView({ assignment }: Props) {
+function SignalJoin({ link }: { link: string }) {
+  return (
+    <div className="flex flex-col items-center space-y-3">
+      <QRCodeSVG value={link} size={200} level="M" />
+      <a href={link} className="px-6 py-3 bg-blue-600 text-white rounded-lg font-bold">
+        Join Signal Group
+      </a>
+      <p className="text-xs text-gray-400">Scan QR code or tap the button</p>
+    </div>
+  );
+}
+
+export default function CanvasserView({ assignment, signalLink }: Props) {
   if (!assignment) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 space-y-6">
         <div className="text-center">
           <div className="text-4xl mb-4 animate-pulse">&#9203;</div>
           <p className="text-xl text-gray-600">Waiting for assignment...</p>
           <p className="text-sm text-gray-400 mt-2">Your organizer is setting up groups</p>
         </div>
+        {signalLink && <SignalJoin link={signalLink} />}
       </div>
     );
   }
@@ -54,18 +67,7 @@ export default function CanvasserView({ assignment }: Props) {
         </div>
       </div>
 
-      {assignment.signalLink && (
-        <div className="flex flex-col items-center space-y-3">
-          <QRCodeSVG value={assignment.signalLink} size={200} level="M" />
-          <a
-            href={assignment.signalLink}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-bold"
-          >
-            Join Signal Group
-          </a>
-          <p className="text-xs text-gray-400">Scan QR code or tap the button</p>
-        </div>
-      )}
+      {signalLink && <SignalJoin link={signalLink} />}
     </div>
   );
 }

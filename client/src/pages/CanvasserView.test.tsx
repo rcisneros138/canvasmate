@@ -34,12 +34,29 @@ describe('CanvasserView', () => {
           listNumber: '4821093',
           groupName: 'Team A',
           members: ['Alice', 'Bob'],
-          signalLink: 'https://signal.group/#abc123',
         }}
+        signalLink="https://signal.group/#abc123"
       />
     );
     expect(screen.getByText('Join Signal Group')).toBeDefined();
     const svg = document.querySelector('svg');
     expect(svg).toBeDefined();
+  });
+
+  it('shows Signal QR while waiting for assignment', () => {
+    render(<CanvasserView assignment={null} signalLink="https://signal.group/#xyz" />);
+    expect(screen.getByText(/waiting for assignment/i)).toBeDefined();
+    expect(screen.getByText(/join signal group/i)).toBeDefined();
+  });
+
+  it('shows Signal QR with assignment present', () => {
+    render(
+      <CanvasserView
+        assignment={{ listNumber: '1', groupName: 'A', members: ['Alice'] }}
+        signalLink="https://signal.group/#xyz"
+      />
+    );
+    expect(screen.getByText('1')).toBeDefined();
+    expect(screen.getByText(/join signal group/i)).toBeDefined();
   });
 });

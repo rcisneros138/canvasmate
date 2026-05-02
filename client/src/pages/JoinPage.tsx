@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import CheckIn from './CheckIn';
-import CanvasserView from './CanvasserView';
+import CanvasserView, { type Assignment } from './CanvasserView';
 import { useWebSocket } from '../hooks/useWebSocket';
 
 interface Props {
@@ -12,13 +12,17 @@ interface Props {
 export default function JoinPage({ __testToken }: Props = {}) {
   const { sessionId } = useParams<{ sessionId: string }>();
   const [sessionToken, setSessionToken] = useState<string | null>(__testToken ?? null);
-  const [assignment, setAssignment] = useState<any>(null);
+  const [assignment, setAssignment] = useState<Assignment | null>(null);
+  const [signalLink, setSignalLink] = useState<string | undefined>(undefined);
 
   const refetch = useCallback(async () => {
     if (!sessionToken || !sessionId) return;
     const res = await fetch(`/api/sessions/${sessionId}`);
     if (!res.ok) return;
     const session = await res.json();
+
+    // Always update signal link, even if no assignment yet.
+    setSignalLink(session.signal_invite_link || undefined);
 
     const canvasser = session.canvassers.find((c: any) => c.session_token === sessionToken);
     if (!canvasser || !canvasser.group_id) return;
@@ -37,7 +41,6 @@ export default function JoinPage({ __testToken }: Props = {}) {
       listNumber: list?.list_number || 'TBD',
       groupName: group.name,
       members,
-      signalLink: session.signal_invite_link || undefined,
       isLead: group.group_lead_canvasser_id === canvasser.id,
     });
   }, [sessionToken, sessionId]);
@@ -72,5 +75,5 @@ export default function JoinPage({ __testToken }: Props = {}) {
     return <CheckIn sessionId={sessionId} onCheckedIn={(token) => setSessionToken(token)} />;
   }
 
-  return <CanvasserView assignment={assignment} />;
+  return <CanvasserView assignment={assignment} signalLink={signalLink} />;
 }
