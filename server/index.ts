@@ -3,7 +3,6 @@ import { purgeExpiredSessions } from './services/cleanup.js';
 
 const { server, db } = buildApp({
   dbPath: './data/canvasmate.db',
-  signalApiUrl: process.env.SIGNAL_API_URL || 'http://localhost:8080',
 });
 
 setInterval(() => purgeExpiredSessions(db), 60 * 60 * 1000); // hourly

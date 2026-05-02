@@ -20,7 +20,7 @@ export interface AppContext {
   wss: WebSocketServer;
 }
 
-export function buildApp(opts: { dbPath: string; signalApiUrl: string }): AppContext {
+export function buildApp(opts: { dbPath: string }): AppContext {
   const app = express();
   const server = createServer(app);
   const db = createDatabase(opts.dbPath);

@@ -7,7 +7,6 @@ let ctx: ReturnType<typeof buildApp> | null = null;
 export async function setup({ provide }: GlobalSetupContext) {
   ctx = buildApp({
     dbPath: ':memory:',
-    signalApiUrl: 'http://localhost:9999', // unreachable; tests don't need real Signal
   });
   await new Promise<void>((resolve, reject) => {
     ctx!.server.once('error', reject);
