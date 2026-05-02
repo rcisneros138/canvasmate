@@ -1,20 +1,11 @@
 # Self-hosting CanvasMate
 
 This guide is for sysadmins running CanvasMate for their own canvass team. The
-stack is two Docker containers: the app (Express + built client) and a Signal
-bridge ([bbernhard/signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api)).
+stack is a single Docker container: the app (Express + built client).
 
 ## 1. Prerequisites
 
 - Docker Engine 24+ with the Compose v2 plugin (`docker compose ...`).
-- A *dedicated* phone number for the bot identity that can receive SMS (or
-  voice) for Signal registration — **not your personal cell**, and not a
-  number anyone on your team currently uses with Signal. See
-  [Choosing a Signal number for the bot](#3-choosing-a-signal-number-for-the-bot)
-  below for options. Signal sometimes requires a CAPTCHA solve before sending
-  verification SMS; see the
-  [signal-cli-rest-api docs](https://github.com/bbernhard/signal-cli-rest-api#register-a-number)
-  for the current workaround.
 - A host with a public hostname if you want canvassers to join from their phones
   (a reverse proxy with TLS is required for camera access from QR scans on most
   mobile browsers).
@@ -34,41 +25,7 @@ curl http://localhost:3000/api/health
 # {"status":"ok"}
 ```
 
-The Signal bridge listens on port 8080 inside the compose network and is
-reachable from the host at `http://localhost:8080` for debugging.
-
-## 3. Choosing a Signal number for the bot
-
-CanvasMate registers **one** phone number with the `signal-cli-rest-api`
-sidecar. That number is the bot identity for the entire deployment and is
-what creates per-group Signal groups every time a session is locked. You
-register it once and reuse it across every future session.
-
-Constraints:
-
-- Signal allows only one active registration per number. Registering a number
-  here signs that number out of any existing Signal install. Re-registering on
-  the original phone later resets safety numbers for every contact and may
-  erase message history.
-- Therefore: **do not use your personal cell**, and do not use a number a
-  teammate currently has on Signal.
-
-Options, ranked by reliability:
-
-1. **Prepaid SIM (recommended).** ~$15 from any carrier, dropped into a spare
-   phone or a USB cellular modem. Most reliable; survives Signal's
-   anti-VoIP heuristics.
-2. **Org-issued mobile line.** A second line on a business plan, dedicated to
-   the bot.
-3. **Organizational landline that can receive SMS.** Works if your provider
-   exposes SMS-to-the-line.
-4. **Google Voice (US only).** Free, but Signal sometimes blocks VoIP numbers
-   during registration. Hit-or-miss; have a fallback ready.
-
-Once registered, share the bot's number with canvassers ahead of the launch
-so they recognize the incoming Signal-group invites.
-
-## 4. First-run setup
+## 3. First-run setup
 
 Open `http://localhost:3000` in a browser and:
 
@@ -76,25 +33,19 @@ Open `http://localhost:3000` in a browser and:
    `POST /api/auth/register` with `{ email, password }`. There is no email
    verification; the first account you create is just an organizer login.
 2. Log in with the credentials you just registered.
-3. Go to `/settings/signal` and submit the dedicated bot number from
-   [section 3](#3-choosing-a-signal-number-for-the-bot). Format it in E.164
-   (`+15551234567`).
-4. Watch that phone for an SMS verification code. Enter it on the same page.
-5. Once `/settings/signal` shows `configured`, you can create sessions and the
-   app will create per-session Signal groups on lock.
+3. (Optional) Paste a Signal group invite link on the session page if you want
+   canvassers to join a group. Create the group on your phone first; copy the
+   invite link from group settings.
 
-If the phone never gets the SMS, see the troubleshooting section below.
+## 4. Persisting data
 
-## 5. Persisting data
-
-Two named volumes are declared in `docker-compose.yml`:
+One named volume is declared in `docker-compose.yml`:
 
 | Volume                       | Container path                       | Contents                                 |
 | ---------------------------- | ------------------------------------ | ---------------------------------------- |
 | `canvasmate_canvasmate-data` | `/app/data`                          | SQLite DB at `/app/data/canvasmate.db`   |
-| `canvasmate_signal-data`     | `/home/.local/share/signal-cli`      | signal-cli state (registration, keys)    |
 
-The volume names are prefixed with the compose project name (`canvasmate` by
+The volume name is prefixed with the compose project name (`canvasmate` by
 default, taken from the directory name). Adjust commands below if you renamed
 the project.
 
@@ -103,7 +54,7 @@ session expires. The cleanup job runs every hour in-process and deletes
 sessions where `expires_at < now`. Migrations and the organizer table are
 persistent.
 
-## 6. Reverse proxy and TLS
+## 5. Reverse proxy and TLS
 
 The app speaks plain HTTP on port 3000 and accepts WebSocket upgrades at
 `/ws/session/:id`. Your reverse proxy must forward both.
@@ -148,7 +99,7 @@ server {
 The `Upgrade`/`Connection` headers are required or the join page will fall
 back to disconnect-reconnect loops on every assignment update.
 
-## 7. Backups
+## 6. Backups
 
 Most user-facing data purges hourly, so backups are mostly migrations and
 organizer credentials. Snapshot the SQLite volume:
@@ -171,11 +122,7 @@ docker run --rm \
 docker compose up -d
 ```
 
-The Signal volume contains private keys for the registered number. Back it up
-the same way (`canvasmate_signal-data`) if you want to avoid re-registering on
-host migration. Treat it as sensitive.
-
-## 8. Updating
+## 7. Updating
 
 ```bash
 git pull
@@ -185,47 +132,7 @@ docker compose up -d --build
 The app container runs migrations on startup. No manual step is needed unless
 release notes say so.
 
-## 9. Resetting Signal
-
-To force re-registration of the Signal number without losing app data:
-
-```bash
-docker compose down
-docker volume rm canvasmate_signal-data
-docker compose up -d
-```
-
-Then re-run `/settings/signal` from the UI.
-
-To wipe everything (Signal state and the app database):
-
-```bash
-docker compose down -v
-docker compose up -d
-```
-
-`down -v` removes both named volumes. You will be back at first-run setup.
-
-## 10. Troubleshooting
-
-### Signal SMS never arrives
-
-The bbernhard image refuses some registrations until a CAPTCHA token is
-provided. Follow the
-[CAPTCHA workaround](https://github.com/bbernhard/signal-cli-rest-api#register-a-number)
-upstream. You can hit the bridge directly to retry:
-
-```bash
-curl -X POST "http://localhost:8080/v1/register/+15551234567" \
-  -H "Content-Type: application/json" \
-  -d '{"captcha":"signalcaptcha://..."}'
-```
-
-Check the bridge logs while debugging:
-
-```bash
-docker compose logs -f signal
-```
+## 8. Troubleshooting
 
 ### `/api/health` works but `/` returns 404
 
@@ -255,10 +162,9 @@ WebSockets are enabled for the hostname.
 
 ### Port conflicts
 
-Both `3000` (app) and `8080` (signal) are published to the host by default.
-Edit the `ports:` section in `docker-compose.yml` to remap them, or remove
-the published ports for `signal` entirely if only the app needs to reach it
-(it talks over the compose-internal `http://signal:8080`).
+Port `3000` (app) is published to the host by default. Edit the `ports:`
+section in `docker-compose.yml` to remap it if it collides with something
+else on the host.
 
 ### Database locked errors
 
