@@ -9,8 +9,6 @@ import { sessionsRouter } from './routes/sessions.js';
 import { checkinRouter } from './routes/checkin.js';
 import { assignmentsRouter } from './routes/assignments.js';
 import { authRouter } from './routes/auth.js';
-import { SignalService } from './services/signal.js';
-import { signalSetupRouter } from './routes/signal-setup.js';
 import { lockRouter } from './routes/lock.js';
 import { setupWebSocket } from './ws/index.js';
 
@@ -18,7 +16,6 @@ export interface AppContext {
   app: express.Express;
   server: ReturnType<typeof createServer>;
   db: Database.Database;
-  signal: SignalService;
   broadcast: (sessionId: string, data: any) => void;
   wss: WebSocketServer;
 }
@@ -28,15 +25,13 @@ export function buildApp(opts: { dbPath: string; signalApiUrl: string }): AppCon
   const server = createServer(app);
   const db = createDatabase(opts.dbPath);
   const { broadcast, wss } = setupWebSocket(server);
-  const signal = new SignalService(opts.signalApiUrl);
 
   app.use(express.json());
   app.use('/api/sessions', sessionsRouter(db, broadcast));
   app.use('/api/checkin', checkinRouter(db));
   app.use('/api/assignments', assignmentsRouter(db, broadcast));
   app.use('/api/auth', authRouter(db));
-  app.use('/api/signal', signalSetupRouter(db, signal));
-  app.use('/api/sessions', lockRouter(db, signal, broadcast));
+  app.use('/api/sessions', lockRouter(db, broadcast));
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok' });
   });
@@ -59,5 +54,5 @@ export function buildApp(opts: { dbPath: string; signalApiUrl: string }): AppCon
     });
   }
 
-  return { app, server, db, signal, broadcast, wss };
+  return { app, server, db, broadcast, wss };
 }
