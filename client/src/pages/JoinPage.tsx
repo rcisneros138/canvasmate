@@ -37,7 +37,7 @@ export default function JoinPage({ __testToken }: Props = {}) {
       listNumber: list?.list_number || 'TBD',
       groupName: group.name,
       members,
-      signalLink: group.signal_group_link || undefined,
+      signalLink: session.signal_invite_link || undefined,
       isLead: group.group_lead_canvasser_id === canvasser.id,
     });
   }, [sessionToken, sessionId]);
@@ -53,7 +53,8 @@ export default function JoinPage({ __testToken }: Props = {}) {
       msg.type === 'solo_assigned' ||
       msg.type === 'canvasser_unassigned' ||
       msg.type === 'session_locked' ||
-      msg.type === 'group_lead_set'
+      msg.type === 'group_lead_set' ||
+      msg.type === 'signal_link_set'
     ) {
       refetch();
     }

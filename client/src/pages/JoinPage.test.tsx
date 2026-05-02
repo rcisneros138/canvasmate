@@ -19,7 +19,7 @@ class MockWebSocket {
   emit(data: any) { this.onmessage?.({ data: JSON.stringify(data) }); }
 }
 
-const TRIGGER_EVENTS = ['group_created', 'solo_assigned', 'canvasser_unassigned', 'session_locked', 'group_lead_set'] as const;
+const TRIGGER_EVENTS = ['group_created', 'solo_assigned', 'canvasser_unassigned', 'session_locked', 'group_lead_set', 'signal_link_set'] as const;
 
 describe('JoinPage WebSocket integration', () => {
   beforeEach(() => {
@@ -31,13 +31,14 @@ describe('JoinPage WebSocket integration', () => {
   it('refetches session when group_created arrives', async () => {
     const sessionResponses = [
       // First poll after check-in — no group yet
-      { canvassers: [{ session_token: 'tok', group_id: null }], groups: [], lists: [], groupLists: [] },
+      { canvassers: [{ session_token: 'tok', group_id: null }], groups: [], lists: [], groupLists: [], signal_invite_link: null },
       // After group_created event
       {
         canvassers: [{ session_token: 'tok', group_id: 1, display_name: 'Alice' }],
         groups: [{ id: 1, name: 'Team A', signal_group_link: null }],
         lists: [{ id: 1, list_number: '4821093' }],
         groupLists: [{ group_id: 1, list_id: 1 }],
+        signal_invite_link: null,
       },
     ];
     let call = 0;
@@ -66,12 +67,13 @@ describe('JoinPage WebSocket integration', () => {
 
   it.each(TRIGGER_EVENTS)('refetches when %s arrives', async (eventType) => {
     const sessionResponses = [
-      { canvassers: [{ session_token: 'tok', group_id: null }], groups: [], lists: [], groupLists: [] },
+      { canvassers: [{ session_token: 'tok', group_id: null }], groups: [], lists: [], groupLists: [], signal_invite_link: null },
       {
         canvassers: [{ session_token: 'tok', group_id: 1, display_name: 'Alice' }],
         groups: [{ id: 1, name: 'Team A', signal_group_link: null }],
         lists: [{ id: 1, list_number: '4821093' }],
         groupLists: [{ group_id: 1, list_id: 1 }],
+        signal_invite_link: null,
       },
     ];
     let call = 0;
@@ -102,7 +104,7 @@ describe('JoinPage WebSocket integration', () => {
     (global.fetch as any).mockImplementation(() =>
       Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ canvassers: [{ session_token: 'tok', group_id: null }], groups: [], lists: [], groupLists: [] }),
+        json: () => Promise.resolve({ canvassers: [{ session_token: 'tok', group_id: null }], groups: [], lists: [], groupLists: [], signal_invite_link: null }),
       })
     );
 
