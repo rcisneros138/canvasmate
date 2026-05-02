@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import AssignmentBoard from './AssignmentBoard';
 import SessionQR from '../components/SessionQR';
 
@@ -8,13 +8,10 @@ export default function SessionPage() {
   const [session, setSession] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [showQR, setShowQR] = useState(false);
-  const [signalConfigured, setSignalConfigured] = useState(false);
 
-  useEffect(() => {
-    fetch('/api/signal/status')
-      .then((r) => r.json())
-      .then((data) => setSignalConfigured(data.status === 'configured'));
-  }, []);
+  const [editingLink, setEditingLink] = useState(false);
+  const [linkInput, setLinkInput] = useState('');
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   const loadSession = useCallback(() => {
     if (!id) return;
@@ -23,90 +20,102 @@ export default function SessionPage() {
         if (!res.ok) throw new Error('Session not found');
         return res.json();
       })
-      .then(setSession)
+      .then((s) => {
+        setSession(s);
+        setLinkInput(s.signal_invite_link || '');
+      })
       .catch((e) => setError(e.message));
   }, [id]);
 
-  useEffect(() => {
-    loadSession();
-  }, [loadSession]);
+  useEffect(() => { loadSession(); }, [loadSession]);
 
   async function handleActivate() {
     const res = await fetch(`/api/sessions/${id}/activate`, { method: 'POST' });
-    if (res.ok) {
-      setShowQR(true);
-      loadSession();
-    }
+    if (res.ok) { setShowQR(true); loadSession(); }
   }
 
   async function handleLock() {
     const res = await fetch(`/api/sessions/${id}/lock`, { method: 'POST' });
+    if (res.ok) loadSession();
+  }
+
+  async function saveLink(value: string | null) {
+    setLinkError(null);
+    if (typeof value === 'string' && !value.startsWith('https://signal.group/#')) {
+      setLinkError('Link must start with https://signal.group/#');
+      return;
+    }
+    const res = await fetch(`/api/sessions/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ signalInviteLink: value }),
+    });
     if (res.ok) {
-      loadSession();
+      const updated = await res.json();
+      setSession((prev: any) => ({ ...prev, ...updated }));
+      setEditingLink(false);
     }
   }
 
   if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-red-600 text-lg">{error}</p>
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center"><p className="text-red-600 text-lg">{error}</p></div>;
+  }
+  if (!session) {
+    return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-500">Loading session...</p></div>;
   }
 
-  if (!session) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Loading session...</p>
-      </div>
-    );
-  }
+  const hasLink = !!session.signal_invite_link && !editingLink;
 
   return (
     <div>
-      <div className="flex items-center gap-4 px-6 pt-4 flex-wrap">
-        {session.status === 'setup' && (
-          <button
-            onClick={handleActivate}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold"
-          >
-            Activate Session
-          </button>
-        )}
-
-        {session.status === 'active' && (
-          <>
+      <div className="px-6 pt-4 pb-2 border-b">
+        <label className="block text-sm font-medium text-gray-700 mb-1">Signal group invite link</label>
+        {hasLink ? (
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-600 truncate max-w-md">{session.signal_invite_link}</span>
+            <button onClick={() => setEditingLink(true)} className="text-sm text-blue-600 underline">Edit</button>
+            <button onClick={() => saveLink(null)} className="text-sm text-red-600 underline">Clear</button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <input
+              type="url"
+              placeholder="https://signal.group/#..."
+              value={linkInput}
+              onChange={(e) => setLinkInput(e.target.value)}
+              className="flex-1 max-w-md p-2 border rounded text-sm"
+            />
             <button
-              onClick={() => setShowQR(!showQR)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium"
+              onClick={() => saveLink(linkInput)}
+              className="px-3 py-2 bg-blue-600 text-white text-sm rounded font-medium"
             >
-              {showQR ? 'Hide QR Code' : 'Show QR Code'}
+              Save
             </button>
-            <button
-              onClick={handleLock}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-bold"
-            >
-              Lock Assignments
-            </button>
-            {!signalConfigured && (
-              <Link to="/settings/signal" className="text-sm text-amber-600 underline">
-                Signal not configured
-              </Link>
+            {editingLink && (
+              <button onClick={() => { setEditingLink(false); setLinkError(null); setLinkInput(session.signal_invite_link || ''); }} className="text-sm text-gray-500 underline">Cancel</button>
             )}
-          </>
+          </div>
         )}
-
-        <span className="text-sm text-gray-500">
-          Status: <span className="font-medium capitalize">{session.status}</span>
-        </span>
-        <span className="text-sm text-gray-500">
-          Canvassers: <span className="font-medium">{session.canvassers.length}</span>
-        </span>
+        {linkError && <p className="text-sm text-red-600 mt-1">{linkError}</p>}
       </div>
 
-      {showQR && session.status === 'active' && (
-        <SessionQR sessionId={session.id} baseUrl={window.location.origin} />
-      )}
+      <div className="flex items-center gap-4 px-6 pt-4 flex-wrap">
+        {session.status === 'setup' && (
+          <button onClick={handleActivate} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold">Activate Session</button>
+        )}
+        {session.status === 'active' && (
+          <>
+            <button onClick={() => setShowQR(!showQR)} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">
+              {showQR ? 'Hide QR Code' : 'Show QR Code'}
+            </button>
+            <button onClick={handleLock} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-bold">Lock Assignments</button>
+          </>
+        )}
+        <span className="text-sm text-gray-500">Status: <span className="font-medium capitalize">{session.status}</span></span>
+        <span className="text-sm text-gray-500">Canvassers: <span className="font-medium">{session.canvassers.length}</span></span>
+      </div>
+
+      {showQR && session.status === 'active' && <SessionQR sessionId={session.id} baseUrl={window.location.origin} />}
 
       {session.status === 'setup' && (
         <div className="px-6 py-12 text-center text-gray-500">
@@ -119,14 +128,12 @@ export default function SessionPage() {
         <div className="px-6 py-4">
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
             <p className="text-green-800 font-bold">Assignments are locked</p>
-            <p className="text-green-600 text-sm mt-1">Canvassers can see their list numbers. Signal groups have been created.</p>
+            <p className="text-green-600 text-sm mt-1">Canvassers can see their list numbers.</p>
           </div>
         </div>
       )}
 
-      {(session.status === 'active' || session.status === 'locked') && (
-        <AssignmentBoard session={session} />
-      )}
+      {(session.status === 'active' || session.status === 'locked') && <AssignmentBoard session={session} />}
     </div>
   );
 }
