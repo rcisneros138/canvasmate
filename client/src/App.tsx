@@ -3,7 +3,6 @@ import OrganizerDashboard from './pages/OrganizerDashboard';
 import CreateSession from './pages/CreateSession';
 import SessionPage from './pages/SessionPage';
 import JoinPage from './pages/JoinPage';
-import SignalSetupPage from './pages/SignalSetupPage';
 
 export default function App() {
   return (
@@ -13,7 +12,6 @@ export default function App() {
         <Route path="/session/new" element={<CreateSession />} />
         <Route path="/session/:id" element={<SessionPage />} />
         <Route path="/join/:sessionId" element={<JoinPage />} />
-        <Route path="/settings/signal" element={<SignalSetupPage />} />
       </Routes>
     </BrowserRouter>
   );
