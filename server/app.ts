@@ -31,7 +31,7 @@ export function buildApp(opts: { dbPath: string; signalApiUrl: string }): AppCon
   const signal = new SignalService(opts.signalApiUrl);
 
   app.use(express.json());
-  app.use('/api/sessions', sessionsRouter(db));
+  app.use('/api/sessions', sessionsRouter(db, broadcast));
   app.use('/api/checkin', checkinRouter(db));
   app.use('/api/assignments', assignmentsRouter(db, broadcast));
   app.use('/api/auth', authRouter(db));

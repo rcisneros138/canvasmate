@@ -3,7 +3,10 @@ import Database from 'better-sqlite3';
 import { nanoid } from 'nanoid';
 import Papa from 'papaparse';
 
-export function sessionsRouter(db: Database.Database) {
+export function sessionsRouter(
+  db: Database.Database,
+  broadcast: (sessionId: string, data: any) => void
+) {
   const router = Router();
 
   router.post('/', (req, res) => {
@@ -75,6 +78,34 @@ export function sessionsRouter(db: Database.Database) {
     ).all(req.params.id);
 
     res.json({ ...(session as any), lists, groups, canvassers, groupLists });
+  });
+
+  router.patch('/:id', (req, res) => {
+    const { id } = req.params;
+    const { signalInviteLink } = req.body;
+
+    if (signalInviteLink !== null && typeof signalInviteLink !== 'string') {
+      res.status(400).json({ error: 'signalInviteLink must be a string or null' });
+      return;
+    }
+
+    if (typeof signalInviteLink === 'string' && !signalInviteLink.startsWith('https://signal.group/#')) {
+      res.status(400).json({ error: 'signalInviteLink must start with https://signal.group/#' });
+      return;
+    }
+
+    const result = db.prepare('UPDATE sessions SET signal_invite_link = ? WHERE id = ?')
+      .run(signalInviteLink, id);
+
+    if (result.changes === 0) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+
+    broadcast(id, { type: 'signal_link_set', signalInviteLink });
+
+    const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(id);
+    res.json(session);
   });
 
   return router;
