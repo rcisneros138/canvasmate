@@ -43,7 +43,7 @@ export default function CheckIn({ sessionId, onCheckedIn }: Props) {
 
       <input
         type="tel"
-        placeholder="Phone (optional, for Signal group)"
+        placeholder="Phone (optional)"
         value={phone}
         onChange={(e) => setPhone(e.target.value)}
         className="w-full p-3 border rounded-lg"

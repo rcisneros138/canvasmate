@@ -123,7 +123,7 @@ If you are filing a code change, please:
    npm test --workspace=client
    npm run test:e2e
    ```
-3. Reference [`docs/plans/2026-04-19-canvasmate-v1-design.md`](docs/plans/2026-04-19-canvasmate-v1-design.md) for the original design intent (problem statement, user roles, data model, scope boundaries). Note that plan files are gitignored going forward, but the v1 design doc is the canonical reference for current behavior.
+3. See the sections above (especially "How it works" and "About the Signal integration") for current behavior, scope boundaries, and the canvasser/organizer flow.
 
 ## License
 
