@@ -5,26 +5,6 @@ services:
       - "3000:3000"
     volumes:
       - canvasmate-data:/app/data
-    environment:
-      - SIGNAL_API_URL=http://signal:8080
-    depends_on:
-      - signal
-
-  signal:
-    image: bbernhard/signal-cli-rest-api:latest
-    ports:
-      - "8080:8080"
-    volumes:
-      - signal-data:/home/.local/share/signal-cli
-    environment:
-      # 'normal' is the bbernhard default and the mode shown in the upstream
-      # README example. It supports the full HTTP surface including
-      # /v1/register/{number}. 'json-rpc' optimizes messaging throughput but
-      # has caused registration issues in the wild — see
-      # docs/runbooks/signal-smoke-test.md Section 9 for the swap procedure
-      # if you want to opt into json-rpc after registration succeeds.
-      - MODE=normal
 
 volumes:
   canvasmate-data:
-  signal-data:
