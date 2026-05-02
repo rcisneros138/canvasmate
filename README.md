@@ -9,7 +9,7 @@ A self-hostable web app that streamlines the launch of door-to-door canvass even
 
 Canvass organizers spend the first 20 minutes of every launch managing list assignments on whiteboards, calling out MiniVAN list numbers across a crowded room, and manually creating Signal groups so each canvass team can stay in touch. It is slow, error-prone, and creates avoidable friction every time a team hits the doors.
 
-CanvasMate replaces that with a projected drag-and-drop board, a phone-friendly check-in flow, and automatic Signal group creation, so the launch takes minutes instead of half an hour.
+CanvasMate replaces that with a projected drag-and-drop board, a phone-friendly check-in flow, and a manual-paste Signal group invite link, so the launch takes minutes instead of half an hour.
 
 ## What it does
 
@@ -18,16 +18,16 @@ CanvasMate replaces that with a projected drag-and-drop board, a phone-friendly 
 - Drag-and-drop assignment board for the organizer's projected screen, with live updates as people check in.
 - Real-time push to canvasser phones over WebSockets when their assignment changes.
 - One-tap copy of the MiniVAN list number on each canvasser's phone.
-- Per-group Signal group creation on lock, with a tappable invite link and QR code shown on the canvasser view.
+- QR-code-based join flow for a Signal group the organizer creates manually on their phone.
 - PII auto-purges on a configurable window (default 24 hours after session expiry) — names, phone numbers, and Signal links all go.
 
 ## How it works (event flow)
 
-1. The organizer creates a session, names it, and uploads list numbers (a TXT file with one number per line, or a CSV).
-2. A QR code goes up on the projector. Canvassers scan it, enter a display name, and optionally provide a phone number for Signal auto-add.
+1. The organizer creates a session, names it, and uploads list numbers (a TXT file with one number per line, or a CSV). Optionally, the organizer pastes a Signal group invite link from a group they've created on their phone.
+2. A QR code goes up on the projector. Canvassers scan it and enter a display name.
 3. As people check in, they appear on the organizer's assignment board. The organizer drags canvassers onto lists or groups, and canvassers see their assignment update live on their phones.
-4. The organizer locks the session. Each group gets a Signal group created automatically; canvassers see the join link and a QR code on their phones.
-5. The session expires (default 24 hours). The hourly cleanup job deletes the session, all canvasser PII, and all Signal links.
+4. The organizer locks the session. Canvassers see the Signal group invite link and a QR code on their phones (if a link was provided).
+5. The session expires (default 24 hours). The hourly cleanup job deletes the session, all canvasser PII, and the Signal link.
 
 ## Screenshots / demo
 
@@ -35,7 +35,7 @@ Screenshots coming soon. If you run an instance and want to contribute screensho
 
 ## Quick start (Docker)
 
-The fastest way to try CanvasMate is the bundled Docker Compose stack, which runs the app alongside a [signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api) bridge.
+The fastest way to try CanvasMate is the bundled Docker Compose stack.
 
 ```bash
 git clone https://github.com/your-org/canvasmate.git
@@ -50,9 +50,9 @@ curl http://localhost:3000/api/health
 # {"status":"ok"}
 ```
 
-Open `http://localhost:3000`, register an organizer account, and (optionally) walk through `/settings/signal` to register a Signal sender number.
+Open `http://localhost:3000` and register an organizer account.
 
-For a real deployment with TLS, reverse proxying, backups, and Signal troubleshooting, see [`docs/deploy.md`](docs/deploy.md).
+For a real deployment with TLS, reverse proxying, and backups, see [`docs/deploy.md`](docs/deploy.md).
 
 ## Local development
 
@@ -84,18 +84,13 @@ npm run test:e2e
 | QR          | `qrcode.react`                                   |
 | Server      | Node.js 22, Express 5, `ws` for WebSockets       |
 | Database    | SQLite via `better-sqlite3`, migrations via Umzug |
-| Signal      | [bbernhard/signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api) sidecar |
 | Packaging   | Single Docker image + Compose stack              |
 
 ## About the Signal integration
 
-CanvasMate's Signal feature is asymmetric: canvassers do nothing special, but the organizer running the instance has to set up a dedicated bot identity once.
+Signal groups are managed manually. When you create a session, paste an invite link from a Signal group you've made on your phone. Canvassers see a QR code on their assignment view that joins the group. No bot account, no SIM, no extra services.
 
-- **Canvassers.** Use Signal normally on their own phones. They scan a QR code (or tap a link) on the canvasser view to join the per-group chat. There is nothing to register, install, or configure on their personal account.
-- **Organizer.** Registers one phone number with the bundled `signal-cli-rest-api` sidecar. That number becomes the bot identity for the whole CanvasMate deployment and is what creates the per-group Signal groups every time a session is locked. Register once, use forever — there is no per-session Signal step.
-- **Do not use your personal cell.** Signal allows only one active registration per number. Registering your own number with the bridge will sign you out of Signal on your phone, and signing back in later resets safety numbers for every contact you have and may erase message history. Use a separate number.
-- **Recommended: a cheap prepaid SIM** (~$15) in a spare phone or USB modem. An organizational landline that can receive SMS, an org-issued mobile line, or Google Voice (US only, sometimes blocked by Signal as VoIP) also work. The deploy guide has a full ranked list: see [`docs/deploy.md`](docs/deploy.md#3-choosing-a-signal-number-for-the-bot).
-- **Tell canvassers the number ahead of time** so an incoming Signal-group invite from an unknown sender is not mistaken for spam.
+The link is optional — leave it blank to skip Signal entirely. Per-team groups can be added later if a single session-wide group turns out to be too coarse.
 
 ## Privacy and data handling
 
@@ -104,16 +99,16 @@ CanvasMate handles canvasser PII (display names, optional phone numbers, optiona
 - **Auto-purge.** A cleanup job (`server/services/cleanup.ts`) runs every hour and deletes any session whose `expires_at` is in the past. The default expiry is 24 hours after session creation. Deleting a session cascades to its canvassers, lists, groups, and Signal links.
 - **Short-lived sessions.** Session tokens are ephemeral and tied to the session row, so they are gone after the same purge.
 - **Local-only database.** SQLite lives at `/app/data/canvasmate.db` inside the container, on a single Docker volume. No data leaves your host.
-- **Signal credentials.** The Signal sender number's keys live inside the `signal-cli-rest-api` sidecar's volume, encrypted at rest by signal-cli's own mechanisms. CanvasMate stores only the sender phone number itself in its settings table.
+- **Signal credentials.** No Signal credentials are stored — the invite link is just a URL.
 - **What is retained.** Organizer accounts (email + password hash) and high-level session metadata; no canvasser PII past the expiry window.
 
-If you self-host, treat the `signal-data` volume as sensitive (it contains the registered number's keys) and consider tightening the default 24-hour purge window if your group's policy requires it.
+If you self-host, consider tightening the default 24-hour purge window if your group's policy requires it.
 
 ## Status and known caveats
 
 CanvasMate is at v1. The core flow — session creation, QR check-in, drag-and-drop assignment, lock, real-time updates, and PII purge — is covered by unit and end-to-end tests.
 
-The Signal integration is wired against the current `signal-cli-rest-api` swagger spec (the lock route iterates groups and calls the bridge; the canvasser view renders the returned invite link as a QR). It has **not yet been verified end-to-end against a live Signal bridge with a registered burner number** — the runbook for that smoke test lives at [`docs/runbooks/signal-smoke-test.md`](docs/runbooks/signal-smoke-test.md) and is the recommended first thing to run before relying on Signal at a real canvass.
+The Signal integration is intentionally minimal: a single optional invite link per session, rendered as a QR code on the canvasser view. There is no bot account, no sidecar, and no per-team Signal group creation. Per-team groups can be added later if a single session-wide group turns out to be too coarse.
 
 ## Contributing
 
@@ -136,5 +131,4 @@ CanvasMate is released under the MIT License. See [`LICENSE`](LICENSE) for the f
 
 ## Acknowledgments
 
-- [bbernhard/signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api) — the upstream Signal HTTP bridge that makes the Signal integration feasible.
 - The political-organizing community whose recurring "I just want a list and a Signal group" frustration was the original prompt for this project.
