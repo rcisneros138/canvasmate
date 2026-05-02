@@ -47,4 +47,9 @@ describe('database', () => {
     const cols = db.prepare("PRAGMA table_info(groups)").all() as any[];
     expect(cols.some(c => c.name === 'group_lead_canvasser_id')).toBe(true);
   });
+
+  it('sessions have a signal_invite_link column', () => {
+    const cols = db.prepare("PRAGMA table_info(sessions)").all() as any[];
+    expect(cols.some(c => c.name === 'signal_invite_link')).toBe(true);
+  });
 });
