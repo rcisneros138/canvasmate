@@ -2,6 +2,7 @@ import { Router } from 'express';
 import Database from 'better-sqlite3';
 import { nanoid } from 'nanoid';
 import Papa from 'papaparse';
+import { requireOrganizer } from '../middleware/auth.js';
 
 export function sessionsRouter(
   db: Database.Database,
@@ -9,8 +10,9 @@ export function sessionsRouter(
 ) {
   const router = Router();
 
-  router.post('/', (req, res) => {
-    const { name, listNumbers, organizerId } = req.body;
+  router.post('/', requireOrganizer, (req, res) => {
+    const { name, listNumbers } = req.body;
+    const organizerId = req.user!.id;
     const id = nanoid(8);
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
@@ -49,10 +51,14 @@ export function sessionsRouter(
     res.status(201).json({ id, name, status: 'setup', lists: savedLists });
   });
 
-  router.post('/:id/activate', (req, res) => {
+  router.post('/:id/activate', requireOrganizer, (req, res) => {
     const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(req.params.id) as any;
     if (!session) {
       res.status(404).json({ error: 'Not found' });
+      return;
+    }
+    if (session.organizer_id !== req.user!.id) {
+      res.status(403).json({ error: 'Not your session' });
       return;
     }
     if (session.status !== 'setup') {
@@ -80,7 +86,7 @@ export function sessionsRouter(
     res.json({ ...(session as any), lists, groups, canvassers, groupLists });
   });
 
-  router.patch('/:id', (req, res) => {
+  router.patch('/:id', requireOrganizer, (req, res) => {
     const { id } = req.params;
     const { signalInviteLink } = req.body;
 
@@ -94,18 +100,37 @@ export function sessionsRouter(
       return;
     }
 
-    const result = db.prepare('UPDATE sessions SET signal_invite_link = ? WHERE id = ?')
-      .run(signalInviteLink, id);
-
-    if (result.changes === 0) {
+    const existing = db.prepare('SELECT organizer_id FROM sessions WHERE id = ?').get(id) as
+      | { organizer_id: string }
+      | undefined;
+    if (!existing) {
       res.status(404).json({ error: 'Session not found' });
       return;
     }
+    if (existing.organizer_id !== req.user!.id) {
+      res.status(403).json({ error: 'Not your session' });
+      return;
+    }
+
+    db.prepare('UPDATE sessions SET signal_invite_link = ? WHERE id = ?').run(signalInviteLink, id);
 
     broadcast(id, { type: 'signal_link_set', signalInviteLink });
 
     const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(id);
     res.json(session);
+  });
+
+  /** List the signed-in organizer's own sessions (for the post-login dashboard). */
+  router.get('/', requireOrganizer, (req, res) => {
+    const rows = db
+      .prepare(
+        `SELECT id, name, status, created_at, expires_at, signal_invite_link
+         FROM sessions
+         WHERE organizer_id = ?
+         ORDER BY created_at DESC`,
+      )
+      .all(req.user!.id);
+    res.json({ sessions: rows });
   });
 
   return router;

@@ -11,6 +11,9 @@ import { assignmentsRouter } from './routes/assignments.js';
 import { authRouter } from './routes/auth.js';
 import { lockRouter } from './routes/lock.js';
 import { setupWebSocket } from './ws/index.js';
+import { readAuth } from './middleware/auth.js';
+import { createMailer, type Mailer } from './services/mailer.js';
+import { createTurnstile, type TurnstileVerifier } from './services/turnstile.js';
 
 export interface AppContext {
   app: express.Express;
@@ -20,17 +23,35 @@ export interface AppContext {
   wss: WebSocketServer;
 }
 
-export function buildApp(opts: { dbPath: string }): AppContext {
+export interface BuildAppOpts {
+  dbPath: string;
+  mailer?: Mailer;
+  turnstile?: TurnstileVerifier;
+  appUrl?: string;
+  cookieSecure?: boolean;
+  /** Hint Express about a front proxy so req.ip is accurate. */
+  trustProxy?: boolean | string | number;
+}
+
+export function buildApp(opts: BuildAppOpts): AppContext {
   const app = express();
   const server = createServer(app);
   const db = createDatabase(opts.dbPath);
   const { broadcast, wss } = setupWebSocket(server);
 
+  const mailer = opts.mailer ?? createMailer();
+  const turnstile = opts.turnstile ?? createTurnstile();
+  const appUrl = opts.appUrl ?? process.env.APP_URL ?? 'http://localhost:5174';
+  const cookieSecure = opts.cookieSecure ?? process.env.NODE_ENV === 'production';
+  const trustProxy = opts.trustProxy ?? process.env.TRUST_PROXY ?? false;
+  app.set('trust proxy', trustProxy);
+
   app.use(express.json());
+  app.use(readAuth(db));
   app.use('/api/sessions', sessionsRouter(db, broadcast));
   app.use('/api/checkin', checkinRouter(db));
   app.use('/api/assignments', assignmentsRouter(db, broadcast));
-  app.use('/api/auth', authRouter(db));
+  app.use('/api/auth', authRouter({ db, mailer, turnstile, appUrl, cookieSecure }));
   app.use('/api/sessions', lockRouter(db, broadcast));
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok' });

@@ -1,52 +1,159 @@
 import { Router } from 'express';
-import Database from 'better-sqlite3';
+import type Database from 'better-sqlite3';
 import { nanoid } from 'nanoid';
-import { scrypt, randomBytes, timingSafeEqual } from 'crypto';
-import { promisify } from 'util';
+import { randomBytes } from 'crypto';
+import { AUTH_COOKIE } from '../middleware/auth.js';
+import { rateLimit } from '../middleware/rateLimit.js';
+import type { Mailer } from '../services/mailer.js';
+import type { TurnstileVerifier } from '../services/turnstile.js';
 
-const scryptAsync = promisify(scrypt);
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const MAGIC_LINK_TTL_MS = 15 * 60 * 1000; // 15 min
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-async function hashPassword(password: string): Promise<string> {
-  const salt = randomBytes(16).toString('hex');
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${salt}:${buf.toString('hex')}`;
+function newToken(): string {
+  return randomBytes(32).toString('hex');
 }
 
-async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  const [salt, key] = hash.split(':');
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  const keyBuf = Buffer.from(key, 'hex');
-  return timingSafeEqual(buf, keyBuf);
+function normaliseEmail(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const v = raw.trim().toLowerCase();
+  if (!EMAIL_RE.test(v)) return null;
+  return v;
 }
 
-export function authRouter(db: Database.Database) {
+function safeNextPath(raw: unknown): string {
+  if (typeof raw !== 'string') return '/';
+  // Only allow same-origin relative paths starting with a single slash.
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '/';
+  return raw;
+}
+
+export interface AuthRouterDeps {
+  db: Database.Database;
+  mailer: Mailer;
+  turnstile: TurnstileVerifier;
+  appUrl: string;
+  cookieSecure: boolean;
+}
+
+export function authRouter({
+  db,
+  mailer,
+  turnstile,
+  appUrl,
+  cookieSecure,
+}: AuthRouterDeps) {
   const router = Router();
 
-  router.post('/register', async (req, res) => {
-    const { email, password } = req.body;
-    const id = nanoid(12);
-    const passwordHash = await hashPassword(password);
+  const requestLimiters = [
+    rateLimit({ windowMs: 60 * 60 * 1000, max: 5 }),
+    rateLimit({ windowMs: 24 * 60 * 60 * 1000, max: 20 }),
+  ];
+
+  router.post('/request', ...requestLimiters, async (req, res) => {
+    const email = normaliseEmail(req.body?.email);
+    if (!email) {
+      res.status(400).json({ error: 'Valid email required' });
+      return;
+    }
+
+    if (turnstile.enabled) {
+      const ok = await turnstile.verify(req.body?.turnstile, req.ip);
+      if (!ok) {
+        res.status(400).json({ error: 'CAPTCHA failed — please try again.' });
+        return;
+      }
+    }
+
+    const next = safeNextPath(req.body?.next);
+    const token = newToken();
+    const expiresAt = new Date(Date.now() + MAGIC_LINK_TTL_MS).toISOString();
+
+    db.prepare(
+      'INSERT INTO magic_links (token, email, expires_at) VALUES (?, ?, ?)',
+    ).run(token, email, expiresAt);
+
+    const link = `${appUrl}/api/auth/verify?token=${token}&next=${encodeURIComponent(next)}`;
 
     try {
-      db.prepare('INSERT INTO organizers (id, email, password_hash) VALUES (?, ?, ?)').run(id, email, passwordHash);
-    } catch {
-      return res.status(409).json({ error: 'Email already registered' });
+      await mailer.sendMagicLink({ to: email, link });
+    } catch (err) {
+      console.error('[auth] mailer failed', err);
+      // Don't leak the failure to the caller — they shouldn't be able to
+      // probe whether an email exists/is deliverable. Status 202 either way.
     }
 
-    const token = nanoid(32);
-    return res.status(201).json({ id, token });
+    res.status(202).json({ ok: true });
   });
 
-  router.post('/login', async (req, res) => {
-    const { email, password } = req.body;
-    const org = db.prepare('SELECT * FROM organizers WHERE email = ?').get(email) as any;
-
-    if (!org || !(await verifyPassword(password, org.password_hash))) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+  router.get('/verify', (req, res) => {
+    const token = typeof req.query.token === 'string' ? req.query.token : '';
+    const next = safeNextPath(req.query.next);
+    if (!token) {
+      res.status(400).json({ error: 'Token required' });
+      return;
     }
 
-    const token = nanoid(32);
-    return res.status(200).json({ id: org.id, token });
+    const row = db
+      .prepare('SELECT email, expires_at, used_at FROM magic_links WHERE token = ?')
+      .get(token) as
+      | { email: string; expires_at: string; used_at: string | null }
+      | undefined;
+
+    if (!row || row.used_at || new Date(row.expires_at).getTime() < Date.now()) {
+      res.status(400).json({ error: 'Invalid or expired link' });
+      return;
+    }
+
+    // Consume the link.
+    db.prepare("UPDATE magic_links SET used_at = datetime('now') WHERE token = ?").run(token);
+
+    // Upsert user.
+    let user = db
+      .prepare('SELECT id FROM users WHERE email = ?')
+      .get(row.email) as { id: string } | undefined;
+    if (!user) {
+      const id = nanoid(12);
+      db.prepare('INSERT INTO users (id, email) VALUES (?, ?)').run(id, row.email);
+      user = { id };
+    }
+    db.prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").run(user.id);
+
+    // Create auth session.
+    const sessionToken = newToken();
+    const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
+    db.prepare(
+      'INSERT INTO auth_sessions (token, user_id, expires_at) VALUES (?, ?, ?)',
+    ).run(sessionToken, user.id, expiresAt);
+
+    res.cookie(AUTH_COOKIE, sessionToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: cookieSecure,
+      path: '/',
+      maxAge: SESSION_TTL_MS,
+    });
+
+    res.redirect(next);
+  });
+
+  router.post('/logout', (req, res) => {
+    const cookieHeader = req.headers.cookie || '';
+    const match = cookieHeader.match(new RegExp(`${AUTH_COOKIE}=([^;]+)`));
+    if (match) {
+      db.prepare('DELETE FROM auth_sessions WHERE token = ?').run(match[1]);
+    }
+    res.clearCookie(AUTH_COOKIE, { path: '/' });
+    res.json({ ok: true });
+  });
+
+  router.get('/me', (req, res) => {
+    if (!req.user) {
+      res.status(200).json({ user: null });
+      return;
+    }
+    res.json({ user: req.user });
   });
 
   return router;

@@ -4,21 +4,36 @@ import request from 'supertest';
 import { createDatabase } from '../db/index';
 import { sessionsRouter } from './sessions';
 import { checkinRouter } from './checkin';
+import { readAuth } from '../middleware/auth';
+import { seedAuthedUser } from '../test-helpers/auth';
+
+function buildTestApp() {
+  const db = createDatabase(':memory:');
+  const app = express();
+  app.use(express.json());
+  app.use(readAuth(db));
+  app.use('/api/sessions', sessionsRouter(db, () => {}));
+  app.use('/api/checkin', checkinRouter(db));
+  const auth = seedAuthedUser(db);
+  return { app, db, auth };
+}
 
 describe('POST /api/checkin', () => {
   let app: express.Express;
+  let db: ReturnType<typeof createDatabase>;
+  let cookie: string;
   let sessionId: string;
 
   beforeEach(async () => {
-    const db = createDatabase(':memory:');
-    app = express();
-    app.use(express.json());
-    app.use('/api/sessions', sessionsRouter(db));
-    app.use('/api/checkin', checkinRouter(db));
+    const built = buildTestApp();
+    app = built.app;
+    db = built.db;
+    cookie = built.auth.cookie;
 
     const res = await request(app)
       .post('/api/sessions')
-      .send({ name: 'Test', listNumbers: '111', organizerId: 'org-1' });
+      .set('Cookie', cookie)
+      .send({ name: 'Test', listNumbers: '111' });
     sessionId = res.body.id;
 
     // Activate session
@@ -45,17 +60,13 @@ describe('POST /api/checkin', () => {
   });
 
   it('rejects check-in to non-active session', async () => {
-    const db2 = createDatabase(':memory:');
-    const app2 = express();
-    app2.use(express.json());
-    app2.use('/api/sessions', sessionsRouter(db2));
-    app2.use('/api/checkin', checkinRouter(db2));
-
-    const s = await request(app2)
+    const built2 = buildTestApp();
+    const s = await request(built2.app)
       .post('/api/sessions')
-      .send({ name: 'X', listNumbers: '111', organizerId: 'org-1' });
+      .set('Cookie', built2.auth.cookie)
+      .send({ name: 'X', listNumbers: '111' });
 
-    const res = await request(app2)
+    const res = await request(built2.app)
       .post('/api/checkin')
       .send({ sessionId: s.body.id, displayName: 'Eve' });
 

@@ -5,23 +5,30 @@ import { createDatabase } from '../db/index';
 import { sessionsRouter } from './sessions';
 import { checkinRouter } from './checkin';
 import { assignmentsRouter } from './assignments';
+import { readAuth } from '../middleware/auth';
+import { seedAuthedUser } from '../test-helpers/auth';
 
 describe('assignments', () => {
   let app: express.Express;
   let db: ReturnType<typeof createDatabase>;
+  let cookie: string;
   let sessionId: string;
 
   beforeEach(async () => {
     db = createDatabase(':memory:');
     app = express();
     app.use(express.json());
-    app.use('/api/sessions', sessionsRouter(db));
+    app.use(readAuth(db));
+    app.use('/api/sessions', sessionsRouter(db, () => {}));
     app.use('/api/checkin', checkinRouter(db));
     app.use('/api/assignments', assignmentsRouter(db, () => {}));
+    const auth = seedAuthedUser(db);
+    cookie = auth.cookie;
 
     const s = await request(app)
       .post('/api/sessions')
-      .send({ name: 'Test', listNumbers: '111\n222', organizerId: 'org-1' });
+      .set('Cookie', cookie)
+      .send({ name: 'Test', listNumbers: '111\n222' });
     sessionId = s.body.id;
     db.prepare("UPDATE sessions SET status = 'active' WHERE id = ?").run(sessionId);
 
@@ -34,6 +41,7 @@ describe('assignments', () => {
 
     const res = await request(app)
       .post('/api/assignments/groups')
+      .set('Cookie', cookie)
       .send({
         sessionId,
         name: 'Team A',
@@ -44,7 +52,6 @@ describe('assignments', () => {
     expect(res.status).toBe(201);
     expect(res.body.name).toBe('Team A');
 
-    // Verify canvassers are assigned
     const updated = db.prepare('SELECT group_id FROM canvassers WHERE session_id = ?').all(sessionId) as any[];
     expect(updated.every((c: any) => c.group_id === res.body.id)).toBe(true);
   });
@@ -54,6 +61,7 @@ describe('assignments', () => {
 
     const res = await request(app)
       .post('/api/assignments/solo')
+      .set('Cookie', cookie)
       .send({
         sessionId,
         canvasserId: canvassers[0].id,
@@ -62,11 +70,29 @@ describe('assignments', () => {
 
     expect(res.status).toBe(200);
   });
+
+  it('rejects unauthenticated requests with 401', async () => {
+    const res = await request(app)
+      .post('/api/assignments/solo')
+      .send({ sessionId, canvasserId: 1, listId: 1 });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects another organizer with 403', async () => {
+    const other = seedAuthedUser(db, 'other@example.com');
+    const res = await request(app)
+      .post('/api/assignments/solo')
+      .set('Cookie', other.cookie)
+      .send({ sessionId, canvasserId: 1, listId: 1 });
+    expect(res.status).toBe(403);
+  });
 });
 
 describe('POST /api/assignments/groups/:id/lead', () => {
   let app: express.Express;
   let db: ReturnType<typeof createDatabase>;
+  let cookie: string;
+  let userId: string;
   let broadcastMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -74,17 +100,23 @@ describe('POST /api/assignments/groups/:id/lead', () => {
     broadcastMock = vi.fn();
     app = express();
     app.use(express.json());
+    app.use(readAuth(db));
     app.use('/api/assignments', assignmentsRouter(db, broadcastMock));
+    const auth = seedAuthedUser(db);
+    cookie = auth.cookie;
+    userId = auth.userId;
   });
 
   it('sets the group lead and broadcasts', async () => {
-    // Seed: session, group, canvasser belonging to that group
-    db.prepare("INSERT INTO sessions (id, name, organizer_id, status, expires_at) VALUES ('s1','S','o1','active',datetime('now','+1 day'))").run();
+    db.prepare(
+      "INSERT INTO sessions (id, name, organizer_id, status, expires_at) VALUES ('s1','S',?,'active',datetime('now','+1 day'))",
+    ).run(userId);
     const groupId = (db.prepare("INSERT INTO groups (session_id, name) VALUES ('s1','A')").run() as any).lastInsertRowid;
     const canvasserId = (db.prepare("INSERT INTO canvassers (session_id, display_name, group_id, session_token) VALUES ('s1','Alice',?,?)").run(groupId, 'tok')).lastInsertRowid;
 
     const res = await request(app)
       .post(`/api/assignments/groups/${groupId}/lead`)
+      .set('Cookie', cookie)
       .send({ sessionId: 's1', canvasserId });
 
     expect(res.status).toBe(200);
@@ -94,12 +126,15 @@ describe('POST /api/assignments/groups/:id/lead', () => {
   });
 
   it('rejects if canvasser is not in the group', async () => {
-    db.prepare("INSERT INTO sessions (id, name, organizer_id, status, expires_at) VALUES ('s1','S','o1','active',datetime('now','+1 day'))").run();
+    db.prepare(
+      "INSERT INTO sessions (id, name, organizer_id, status, expires_at) VALUES ('s1','S',?,'active',datetime('now','+1 day'))",
+    ).run(userId);
     const groupId = (db.prepare("INSERT INTO groups (session_id, name) VALUES ('s1','A')").run() as any).lastInsertRowid;
     const otherId = (db.prepare("INSERT INTO canvassers (session_id, display_name, session_token) VALUES ('s1','Bob','tok2')").run()).lastInsertRowid;
 
     const res = await request(app)
       .post(`/api/assignments/groups/${groupId}/lead`)
+      .set('Cookie', cookie)
       .send({ sessionId: 's1', canvasserId: otherId });
 
     expect(res.status).toBe(400);
@@ -109,15 +144,18 @@ describe('POST /api/assignments/groups/:id/lead', () => {
   });
 
   it('returns 404 when group does not exist in session', async () => {
-    db.prepare("INSERT INTO sessions (id, name, organizer_id, status, expires_at) VALUES ('s1','S','o1','active',datetime('now','+1 day'))").run();
-    db.prepare("INSERT INTO sessions (id, name, organizer_id, status, expires_at) VALUES ('s2','S2','o1','active',datetime('now','+1 day'))").run();
-    // Group belongs to s2, but request claims sessionId s1
+    db.prepare(
+      "INSERT INTO sessions (id, name, organizer_id, status, expires_at) VALUES ('s1','S',?,'active',datetime('now','+1 day'))",
+    ).run(userId);
+    db.prepare(
+      "INSERT INTO sessions (id, name, organizer_id, status, expires_at) VALUES ('s2','S2',?,'active',datetime('now','+1 day'))",
+    ).run(userId);
     const groupId = (db.prepare("INSERT INTO groups (session_id, name) VALUES ('s2','A')").run() as any).lastInsertRowid;
-    // Canvasser in s1 with matching group_id (simulates a numeric collision)
     const canvasserId = (db.prepare("INSERT INTO canvassers (session_id, display_name, group_id, session_token) VALUES ('s1','Alice',?,?)").run(groupId, 'tok')).lastInsertRowid;
 
     const res = await request(app)
       .post(`/api/assignments/groups/${groupId}/lead`)
+      .set('Cookie', cookie)
       .send({ sessionId: 's1', canvasserId });
 
     expect(res.status).toBe(404);

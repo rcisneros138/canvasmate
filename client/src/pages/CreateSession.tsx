@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
+import { useAuth, useRequireAuth } from '../hooks/useAuth';
 
 interface ParsedList {
   numbers: string[];
@@ -38,6 +39,8 @@ function defaultSessionName(): string {
 }
 
 export default function CreateSession() {
+  const ready = useRequireAuth();
+  const { user, signOut } = useAuth();
   const [name, setName] = useState('');
   const [listInput, setListInput] = useState('');
   const [dragging, setDragging] = useState(false);
@@ -73,13 +76,17 @@ export default function CreateSession() {
     try {
       const res = await fetch('/api/sessions', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: finalName,
           listNumbers: listInput,
-          organizerId: 'temp',
         }),
       });
+      if (res.status === 401) {
+        navigate(`/sign-in?next=/session/new`);
+        return;
+      }
       const session = await res.json();
       navigate(`/session/${session.id}`);
     } finally {
@@ -91,8 +98,31 @@ export default function CreateSession() {
     ? 'Add list numbers to continue'
     : null;
 
+  if (!ready) {
+    return (
+      <AppShell>
+        <div className="min-h-[40vh] flex items-center justify-center">
+          <p className="font-mono text-sm uppercase tracking-widest text-[var(--color-muted)]">
+            Loading…
+          </p>
+        </div>
+      </AppShell>
+    );
+  }
+
   return (
-    <AppShell>
+    <AppShell
+      right={
+        <div className="flex items-center gap-4">
+          <span className="font-mono text-xs uppercase tracking-widest text-[var(--color-ink-soft)] hidden sm:inline">
+            {user!.email}
+          </span>
+          <button onClick={() => void signOut()} className="btn-link">
+            Sign out
+          </button>
+        </div>
+      }
+    >
       <div className="mx-auto w-full max-w-[1180px] px-6 lg:px-10 py-10 lg:py-16">
         <div className="grid grid-cols-1 lg:grid-cols-[1.25fr_1fr] gap-10 lg:gap-16">
           {/* ---------- LEFT: form ---------- */}

@@ -1,11 +1,34 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import Database from 'better-sqlite3';
+import { requireOrganizer } from '../middleware/auth.js';
 
 export function assignmentsRouter(db: Database.Database, broadcast: (sessionId: string, data: any) => void) {
   const router = Router();
 
+  router.use(requireOrganizer);
+
+  /**
+   * Confirms the signed-in organizer owns `sessionId`. Writes the appropriate
+   * 404/403 response and returns false when they don't.
+   */
+  function checkOwnership(req: Request, res: Response, sessionId: string): boolean {
+    const row = db
+      .prepare('SELECT organizer_id FROM sessions WHERE id = ?')
+      .get(sessionId) as { organizer_id: string } | undefined;
+    if (!row) {
+      res.status(404).json({ error: 'Session not found' });
+      return false;
+    }
+    if (row.organizer_id !== req.user!.id) {
+      res.status(403).json({ error: 'Not your session' });
+      return false;
+    }
+    return true;
+  }
+
   router.post('/groups', (req, res) => {
     const { sessionId, name, listIds, canvasserIds } = req.body;
+    if (!checkOwnership(req, res, sessionId)) return;
 
     const result = db.prepare(
       'INSERT INTO groups (session_id, name) VALUES (?, ?)'
@@ -33,8 +56,8 @@ export function assignmentsRouter(db: Database.Database, broadcast: (sessionId: 
 
   router.post('/solo', (req, res) => {
     const { sessionId, canvasserId, listId } = req.body;
+    if (!checkOwnership(req, res, sessionId)) return;
 
-    // Create a solo group
     const result = db.prepare(
       'INSERT INTO groups (session_id, name) VALUES (?, ?)'
     ).run(sessionId, `Solo`);
@@ -55,6 +78,7 @@ export function assignmentsRouter(db: Database.Database, broadcast: (sessionId: 
 
   router.post('/unassign', (req, res) => {
     const { sessionId, canvasserId } = req.body;
+    if (!checkOwnership(req, res, sessionId)) return;
 
     db.prepare('UPDATE canvassers SET group_id = NULL WHERE id = ? AND session_id = ?').run(canvasserId, sessionId);
 
@@ -69,6 +93,7 @@ export function assignmentsRouter(db: Database.Database, broadcast: (sessionId: 
   router.post('/groups/:id/lead', (req, res) => {
     const groupId = Number(req.params.id);
     const { sessionId, canvasserId } = req.body;
+    if (!checkOwnership(req, res, sessionId)) return;
 
     const canvasser = db.prepare(
       'SELECT group_id FROM canvassers WHERE id = ? AND session_id = ?'
