@@ -15,9 +15,6 @@ declare global {
   }
 }
 
-const TURNSTILE_SITE_KEY: string | undefined = import.meta.env
-  .VITE_TURNSTILE_SITE_KEY as string | undefined;
-
 export default function SignIn() {
   const [params] = useSearchParams();
   const next = params.get('next') || '/';
@@ -31,11 +28,19 @@ export default function SignIn() {
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileSlot = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!TURNSTILE_SITE_KEY) return;
+    fetch('/api/config')
+      .then((r) => (r.ok ? r.json() : { turnstileSiteKey: null }))
+      .then((d) => setTurnstileSiteKey(d.turnstileSiteKey ?? null))
+      .catch(() => setTurnstileSiteKey(null));
+  }, []);
+
+  useEffect(() => {
+    if (!turnstileSiteKey) return;
     if (document.querySelector('script[data-turnstile]')) return;
     const s = document.createElement('script');
     s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
@@ -43,10 +48,10 @@ export default function SignIn() {
     s.defer = true;
     s.dataset.turnstile = '1';
     document.head.appendChild(s);
-  }, []);
+  }, [turnstileSiteKey]);
 
   useEffect(() => {
-    if (!TURNSTILE_SITE_KEY || sent) return;
+    if (!turnstileSiteKey || sent) return;
     let cancelled = false;
     const tryRender = () => {
       if (cancelled) return;
@@ -55,7 +60,7 @@ export default function SignIn() {
         return;
       }
       window.turnstile.render(turnstileSlot.current, {
-        sitekey: TURNSTILE_SITE_KEY!,
+        sitekey: turnstileSiteKey,
         callback: (token: string) => setTurnstileToken(token),
       });
     };
@@ -63,9 +68,9 @@ export default function SignIn() {
     return () => {
       cancelled = true;
     };
-  }, [sent]);
+  }, [turnstileSiteKey, sent]);
 
-  const captchaReady = !TURNSTILE_SITE_KEY || !!turnstileToken;
+  const captchaReady = !turnstileSiteKey || !!turnstileToken;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -141,7 +146,7 @@ export default function SignIn() {
               </p>
             )}
 
-            {TURNSTILE_SITE_KEY && (
+            {turnstileSiteKey && (
               <div ref={turnstileSlot} className="lift-in delay-3" />
             )}
 

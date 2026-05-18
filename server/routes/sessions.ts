@@ -87,7 +87,7 @@ export function sessionsRouter(
   });
 
   router.patch('/:id', requireOrganizer, (req, res) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { signalInviteLink } = req.body;
 
     if (signalInviteLink !== null && typeof signalInviteLink !== 'string') {

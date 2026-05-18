@@ -9,7 +9,7 @@ export function lockRouter(
   const router = Router();
 
   router.post('/:sessionId/lock', requireOrganizer, (req, res) => {
-    const { sessionId } = req.params;
+    const sessionId = req.params.sessionId as string;
     const session = db
       .prepare('SELECT organizer_id FROM sessions WHERE id = ?')
       .get(sessionId) as { organizer_id: string } | undefined;

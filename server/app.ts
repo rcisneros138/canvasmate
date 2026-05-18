@@ -57,6 +57,14 @@ export function buildApp(opts: BuildAppOpts): AppContext {
     res.json({ status: 'ok' });
   });
 
+  // Runtime-readable public config — lets the client render Turnstile (or skip
+  // it) without a rebuild when the operator rotates keys.
+  app.get('/api/config', (_req, res) => {
+    res.json({
+      turnstileSiteKey: process.env.TURNSTILE_SITE_KEY || null,
+    });
+  });
+
   // Serve the built client bundle in production. Skipped in tests / dev where
   // client/dist isn't present (Vite serves the client during dev).
   const clientDist = path.resolve(process.cwd(), 'client/dist');
