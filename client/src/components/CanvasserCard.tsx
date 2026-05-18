@@ -9,9 +9,13 @@ interface Props {
 }
 
 export default function CanvasserCard({ id, name, isLead, groupId, sessionId }: Props) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `canvasser-${id}` });
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `canvasser-${id}`,
+  });
 
-  const style = transform ? { transform: `translate(${transform.x}px, ${transform.y}px)` } : undefined;
+  const style = transform
+    ? { transform: `translate(${transform.x}px, ${transform.y}px)` }
+    : undefined;
 
   async function handleMakeLead(e: React.MouseEvent) {
     e.stopPropagation();
@@ -32,22 +36,30 @@ export default function CanvasserCard({ id, name, isLead, groupId, sessionId }: 
       style={style}
       {...listeners}
       {...attributes}
-      className="p-3 bg-white rounded-lg shadow border cursor-grab active:cursor-grabbing flex items-center justify-between"
+      className={`group/card flex items-center justify-between gap-2 px-3 py-2.5 bg-[var(--color-paper)] border border-[var(--color-rule)] rounded-[2px] cursor-grab active:cursor-grabbing transition-[box-shadow,transform] ${
+        isDragging
+          ? 'shadow-none opacity-50'
+          : 'shadow-[1px_1px_0_0_var(--color-rule)] hover:shadow-[2px_2px_0_0_var(--color-rule)] hover:-translate-y-px'
+      }`}
     >
-      <span className="flex items-center gap-2">
+      <span className="flex items-center gap-2 min-w-0">
         {isLead && (
-          <span aria-label={`Group lead: ${name}`} title="Group lead">
+          <span
+            aria-label={`Group lead: ${name}`}
+            title="Group lead"
+            className="text-[var(--color-signal)] text-sm"
+          >
             ★
           </span>
         )}
-        {name}
+        <span className="truncate text-sm font-medium">{name}</span>
       </span>
       {groupId != null && !isLead && (
         <button
           onPointerDown={(e) => e.stopPropagation()}
           onClick={handleMakeLead}
-          className="text-xs text-blue-600 hover:underline ml-2"
           aria-label={`Make ${name} the lead`}
+          className="opacity-0 group-hover/card:opacity-100 transition-opacity font-mono text-[10px] uppercase tracking-widest text-[var(--color-signal)] hover:underline shrink-0"
         >
           Make lead
         </button>

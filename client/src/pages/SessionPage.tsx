@@ -2,6 +2,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import AssignmentBoard from './AssignmentBoard';
 import SessionQR from '../components/SessionQR';
+import AppShell from '../components/AppShell';
+
+type Status = 'setup' | 'active' | 'locked';
 
 export default function SessionPage() {
   const { id } = useParams<{ id: string }>();
@@ -27,11 +30,16 @@ export default function SessionPage() {
       .catch((e) => setError(e.message));
   }, [id]);
 
-  useEffect(() => { loadSession(); }, [loadSession]);
+  useEffect(() => {
+    loadSession();
+  }, [loadSession]);
 
   async function handleActivate() {
     const res = await fetch(`/api/sessions/${id}/activate`, { method: 'POST' });
-    if (res.ok) { setShowQR(true); loadSession(); }
+    if (res.ok) {
+      setShowQR(true);
+      loadSession();
+    }
   }
 
   async function handleLock() {
@@ -58,82 +66,200 @@ export default function SessionPage() {
   }
 
   if (error) {
-    return <div className="min-h-screen flex items-center justify-center"><p className="text-red-600 text-lg">{error}</p></div>;
+    return (
+      <AppShell>
+        <div className="min-h-[60vh] flex items-center justify-center px-6">
+          <div className="card p-8 max-w-md text-center space-y-2">
+            <div className="eyebrow">Error</div>
+            <p className="font-display text-2xl text-[var(--color-signal)]">{error}</p>
+          </div>
+        </div>
+      </AppShell>
+    );
   }
   if (!session) {
-    return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-500">Loading session...</p></div>;
+    return (
+      <AppShell>
+        <div className="min-h-[60vh] flex items-center justify-center">
+          <p className="font-mono text-sm uppercase tracking-widest text-[var(--color-muted)]">
+            Loading session…
+          </p>
+        </div>
+      </AppShell>
+    );
   }
 
+  const status = session.status as Status;
   const hasLink = !!session.signal_invite_link && !editingLink;
 
   return (
-    <div>
-      <div className="px-6 pt-4 pb-2 border-b">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Signal group invite link</label>
-        {hasLink ? (
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-600 truncate max-w-md">{session.signal_invite_link}</span>
-            <button onClick={() => setEditingLink(true)} className="text-sm text-blue-600 underline">Edit</button>
-            <button onClick={() => saveLink(null)} className="text-sm text-red-600 underline">Clear</button>
+    <AppShell right={<StatusChip status={status} />}>
+      <div className="px-6 lg:px-10 py-8 space-y-8">
+        <header className="flex items-end justify-between flex-wrap gap-6">
+          <div className="space-y-2">
+            <div className="eyebrow">Session</div>
+            <h1 className="font-display text-[clamp(36px,5vw,56px)] leading-[0.95] tracking-tight">
+              {session.name}
+            </h1>
+            <div className="flex items-center gap-3 font-mono text-xs uppercase tracking-widest text-[var(--color-muted)]">
+              <span>
+                <span className="text-[var(--color-ink)]">
+                  {session.canvassers.length}
+                </span>{' '}
+                canvassers
+              </span>
+              <span aria-hidden>·</span>
+              <span>
+                <span className="text-[var(--color-ink)]">
+                  {session.lists.length}
+                </span>{' '}
+                lists
+              </span>
+            </div>
           </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <input
-              type="url"
-              placeholder="https://signal.group/#..."
-              value={linkInput}
-              onChange={(e) => setLinkInput(e.target.value)}
-              className="flex-1 max-w-md p-2 border rounded text-sm"
-            />
-            <button
-              onClick={() => saveLink(linkInput)}
-              className="px-3 py-2 bg-blue-600 text-white text-sm rounded font-medium"
-            >
-              Save
-            </button>
-            {editingLink && (
-              <button onClick={() => { setEditingLink(false); setLinkError(null); setLinkInput(session.signal_invite_link || ''); }} className="text-sm text-gray-500 underline">Cancel</button>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            {status === 'setup' && (
+              <button onClick={handleActivate} className="btn-primary">
+                Activate session
+                <span aria-hidden className="font-mono text-sm opacity-70">→</span>
+              </button>
+            )}
+            {status === 'active' && (
+              <>
+                <button
+                  onClick={() => setShowQR((v) => !v)}
+                  className="btn-secondary"
+                >
+                  {showQR ? 'Hide QR code' : 'Show QR code'}
+                </button>
+                <button
+                  onClick={handleLock}
+                  className="btn-primary"
+                >
+                  Lock assignments
+                </button>
+              </>
             )}
           </div>
-        )}
-        {linkError && <p className="text-sm text-red-600 mt-1">{linkError}</p>}
-      </div>
+        </header>
 
-      <div className="flex items-center gap-4 px-6 pt-4 flex-wrap">
-        {session.status === 'setup' && (
-          <button onClick={handleActivate} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold">Activate Session</button>
-        )}
-        {session.status === 'active' && (
-          <>
-            <button onClick={() => setShowQR(!showQR)} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">
-              {showQR ? 'Hide QR Code' : 'Show QR Code'}
-            </button>
-            <button onClick={handleLock} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-bold">Lock Assignments</button>
-          </>
-        )}
-        <span className="text-sm text-gray-500">Status: <span className="font-medium capitalize">{session.status}</span></span>
-        <span className="text-sm text-gray-500">Canvassers: <span className="font-medium">{session.canvassers.length}</span></span>
-      </div>
-
-      {showQR && session.status === 'active' && <SessionQR sessionId={session.id} baseUrl={window.location.origin} />}
-
-      {session.status === 'setup' && (
-        <div className="px-6 py-12 text-center text-gray-500">
-          <p className="text-lg">Session is in setup mode.</p>
-          <p className="text-sm mt-2">Click "Activate Session" to start accepting check-ins and show the QR code.</p>
-        </div>
-      )}
-
-      {session.status === 'locked' && (
-        <div className="px-6 py-4">
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-            <p className="text-green-800 font-bold">Assignments are locked</p>
-            <p className="text-green-600 text-sm mt-1">Canvassers can see their list numbers.</p>
+        <section className="card p-5 lg:p-6 space-y-3">
+          <div className="flex items-baseline justify-between flex-wrap gap-3">
+            <label className="eyebrow !text-[var(--color-ink-soft)]">
+              Signal group invite link
+            </label>
+            {hasLink && (
+              <div className="flex items-center gap-4">
+                <button onClick={() => setEditingLink(true)} className="btn-link">
+                  Edit
+                </button>
+                <button
+                  onClick={() => saveLink(null)}
+                  className="btn-link !text-[var(--color-signal)]"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
           </div>
-        </div>
-      )}
 
-      {(session.status === 'active' || session.status === 'locked') && <AssignmentBoard session={session} />}
-    </div>
+          {hasLink ? (
+            <p className="font-mono text-sm break-all text-[var(--color-ink-soft)]">
+              {session.signal_invite_link}
+            </p>
+          ) : (
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="url"
+                placeholder="https://signal.group/#..."
+                value={linkInput}
+                onChange={(e) => setLinkInput(e.target.value)}
+                className="field flex-1"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => saveLink(linkInput)}
+                  className="btn-primary !py-3"
+                >
+                  Save
+                </button>
+                {editingLink && (
+                  <button
+                    onClick={() => {
+                      setEditingLink(false);
+                      setLinkError(null);
+                      setLinkInput(session.signal_invite_link || '');
+                    }}
+                    className="btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          {linkError && (
+            <p className="font-mono text-xs text-[var(--color-signal)]">{linkError}</p>
+          )}
+        </section>
+
+        {showQR && status === 'active' && (
+          <SessionQR sessionId={session.id} baseUrl={window.location.origin} />
+        )}
+
+        {status === 'setup' && (
+          <div className="card p-10 text-center space-y-3">
+            <div className="eyebrow !text-[var(--color-muted)]">Not yet active</div>
+            <p className="font-display text-2xl tracking-tight">
+              Session is in setup mode.
+            </p>
+            <p className="text-sm text-[var(--color-ink-soft)] max-w-md mx-auto">
+              Click <span className="font-mono">Activate session</span> to start
+              accepting check-ins and show the QR code.
+            </p>
+          </div>
+        )}
+
+        {status === 'locked' && (
+          <div
+            className="card p-5 flex items-center gap-4"
+            style={{
+              background:
+                'color-mix(in oklab, var(--color-leaf) 14%, var(--color-paper))',
+              borderColor:
+                'color-mix(in oklab, var(--color-leaf) 45%, var(--color-rule))',
+            }}
+          >
+            <span
+              aria-hidden
+              className="text-[var(--color-leaf)] font-display text-2xl"
+            >
+              ✓
+            </span>
+            <div>
+              <p className="font-display text-xl">Assignments are locked</p>
+              <p className="text-sm text-[var(--color-ink-soft)]">
+                Canvassers can see their list numbers.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {(status === 'active' || status === 'locked') && (
+          <AssignmentBoard session={session} />
+        )}
+      </div>
+    </AppShell>
   );
+}
+
+function StatusChip({ status }: { status: Status }) {
+  const map: Record<Status, { label: string; cls: string }> = {
+    setup: { label: 'Setup', cls: 'chip' },
+    active: { label: 'Active', cls: 'chip chip-mark' },
+    locked: { label: 'Locked', cls: 'chip chip-leaf' },
+  };
+  const { label, cls } = map[status];
+  return <span className={cls}>{label}</span>;
 }

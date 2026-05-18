@@ -18,7 +18,8 @@ export default defineConfig({
       manifest: {
         name: 'CanvasMate',
         short_name: 'CanvasMate',
-        theme_color: '#1e40af',
+        theme_color: '#F4EFE0',
+        background_color: '#F4EFE0',
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },

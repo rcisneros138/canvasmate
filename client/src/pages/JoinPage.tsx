@@ -65,8 +65,13 @@ export default function JoinPage({ __testToken }: Props = {}) {
 
   if (!sessionId) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-red-600">Invalid session link</p>
+      <div className="min-h-screen flex items-center justify-center px-6">
+        <div className="card p-8 max-w-md text-center space-y-2">
+          <div className="eyebrow">Error</div>
+          <p className="font-display text-2xl text-[var(--color-signal)]">
+            Invalid session link
+          </p>
+        </div>
       </div>
     );
   }

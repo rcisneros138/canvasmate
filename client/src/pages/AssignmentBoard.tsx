@@ -21,12 +21,10 @@ function buildCanvasserListMap(
   canvassers: Session['canvassers'],
   groupLists: Session['groupLists']
 ): Map<number, number> {
-  // Map group_id -> list_id
   const groupToList = new Map<number, number>();
   for (const gl of groupLists) {
     groupToList.set(gl.group_id, gl.list_id);
   }
-  // Map canvasser_id -> list_id
   const map = new Map<number, number>();
   for (const c of canvassers) {
     if (c.group_id) {
@@ -40,7 +38,6 @@ function buildCanvasserListMap(
 export default function AssignmentBoard({ session: initial }: Props) {
   const [canvassers, setCanvassers] = useState(initial.canvassers);
   const [groups, setGroups] = useState(initial.groups);
-  // canvasserId -> listId
   const [assignments, setAssignments] = useState<Map<number, number>>(
     () => buildCanvasserListMap(initial.canvassers, initial.groupLists || [])
   );
@@ -106,7 +103,6 @@ export default function AssignmentBoard({ session: initial }: Props) {
     const targetId = over.id.toString();
 
     if (targetId === 'unassigned') {
-      // Unassign canvasser
       await fetch('/api/assignments/unassign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -119,7 +115,6 @@ export default function AssignmentBoard({ session: initial }: Props) {
       });
     } else {
       const listId = parseInt(targetId.replace('list-', ''));
-      // Assign canvasser to list
       await fetch('/api/assignments/solo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -152,17 +147,29 @@ export default function AssignmentBoard({ session: initial }: Props) {
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="min-h-screen p-6">
-        <h1 className="text-2xl font-bold mb-6">{initial.name}</h1>
+      <div className="px-6 lg:px-10 py-8 space-y-6">
+        <div className="flex items-baseline justify-between flex-wrap gap-3">
+          <div>
+            <div className="eyebrow !text-[var(--color-ink-soft)]">Assignment board</div>
+            <h2 className="font-display text-3xl sm:text-4xl tracking-tight mt-1">
+              {initial.name}
+            </h2>
+          </div>
+          <p className="font-mono text-xs uppercase tracking-widest text-[var(--color-muted)]">
+            Drag canvassers · drop on a list
+          </p>
+        </div>
 
-        <div className="flex gap-6">
-          {/* Unassigned column — droppable */}
-          <GroupColumn id="unassigned" listNumber="Unassigned" label={`${unassigned.length} canvassers`}>
+        <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-5">
+          <GroupColumn
+            id="unassigned"
+            listNumber="Unassigned"
+            label={`${unassigned.length} canvassers`}
+          >
             {unassigned.map(renderCard)}
           </GroupColumn>
 
-          {/* List columns */}
-          <div className="flex gap-4 flex-1 overflow-x-auto">
+          <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1">
             {initial.lists.map((list) => {
               const assigned = canvassers.filter((c) => assignments.get(c.id) === list.id);
               return (
@@ -182,7 +189,7 @@ export default function AssignmentBoard({ session: initial }: Props) {
 
       <DragOverlay>
         {draggingCanvasser && (
-          <div className="p-3 bg-white rounded-lg shadow-lg border-2 border-blue-500 cursor-grabbing">
+          <div className="px-3 py-2.5 bg-[var(--color-paper)] border border-[var(--color-signal)] rounded-[2px] shadow-[3px_3px_0_0_var(--color-rule)] font-medium text-sm cursor-grabbing">
             {draggingCanvasser.display_name}
           </div>
         )}

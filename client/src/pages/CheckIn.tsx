@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import AppShell from '../components/AppShell';
 
 interface Props {
   sessionId: string;
@@ -18,7 +19,12 @@ export default function CheckIn({ sessionId, onCheckedIn }: Props) {
     const res = await fetch('/api/checkin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId, displayName: name, phone: phone || undefined, minivanId: minivanId || undefined }),
+      body: JSON.stringify({
+        sessionId,
+        displayName: name,
+        phone: phone || undefined,
+        minivanId: minivanId || undefined,
+      }),
     });
 
     if (res.ok) {
@@ -29,41 +35,101 @@ export default function CheckIn({ sessionId, onCheckedIn }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-sm mx-auto p-6 space-y-4">
-      <h1 className="text-2xl font-bold text-center">Check In</h1>
+    <AppShell>
+      <div className="mx-auto w-full max-w-md px-6 py-12 sm:py-20">
+        <form onSubmit={handleSubmit} className="space-y-7">
+          <header className="space-y-2">
+            <div className="eyebrow lift-in">Volunteer</div>
+            <h1 className="font-display text-[clamp(48px,8vw,72px)] leading-[0.95] tracking-[-0.01em] lift-in delay-1">
+              Check in.
+            </h1>
+            <p className="text-[var(--color-ink-soft)] lift-in delay-2">
+              Get your route and your group before you hit the doors.
+            </p>
+          </header>
 
-      <input
-        type="text"
-        placeholder="Your name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        required
-        className="w-full p-3 border rounded-lg text-lg"
-      />
+          <div className="space-y-4 lift-in delay-3">
+            <Field
+              id="name"
+              label="Your name"
+              required
+              placeholder="Your name"
+              value={name}
+              onChange={setName}
+              autoFocus
+            />
+            <Field
+              id="phone"
+              type="tel"
+              label="Phone"
+              optional
+              placeholder="Optional"
+              value={phone}
+              onChange={setPhone}
+            />
+            <Field
+              id="minivan"
+              label="MiniVAN ID"
+              optional
+              placeholder="Optional"
+              value={minivanId}
+              onChange={setMinivanId}
+            />
+          </div>
 
-      <input
-        type="tel"
-        placeholder="Phone (optional)"
-        value={phone}
-        onChange={(e) => setPhone(e.target.value)}
-        className="w-full p-3 border rounded-lg"
-      />
+          <button
+            type="submit"
+            disabled={!name || loading}
+            className="btn-primary w-full lift-in delay-4"
+          >
+            {loading ? 'Checking in…' : 'Check In'}
+          </button>
+        </form>
+      </div>
+    </AppShell>
+  );
+}
 
-      <input
-        type="text"
-        placeholder="MiniVAN ID (optional)"
-        value={minivanId}
-        onChange={(e) => setMinivanId(e.target.value)}
-        className="w-full p-3 border rounded-lg"
-      />
-
-      <button
-        type="submit"
-        disabled={!name || loading}
-        className="w-full p-3 bg-blue-600 text-white rounded-lg font-bold text-lg disabled:opacity-50"
+function Field({
+  id,
+  label,
+  type = 'text',
+  required,
+  optional,
+  placeholder,
+  value,
+  onChange,
+  autoFocus,
+}: {
+  id: string;
+  label: string;
+  type?: string;
+  required?: boolean;
+  optional?: boolean;
+  placeholder?: string;
+  value: string;
+  onChange: (v: string) => void;
+  autoFocus?: boolean;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label
+        htmlFor={id}
+        className="flex items-baseline justify-between eyebrow !text-[var(--color-ink-soft)]"
       >
-        {loading ? 'Checking in...' : 'Check In'}
-      </button>
-    </form>
+        <span>{label}</span>
+        {optional && <span className="text-[var(--color-muted)]">optional</span>}
+      </label>
+      <input
+        id={id}
+        type={type}
+        required={required}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        autoFocus={autoFocus}
+        className="field"
+      />
+    </div>
   );
 }

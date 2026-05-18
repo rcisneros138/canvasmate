@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import AppShell from '../components/AppShell';
 
 export interface Assignment {
   listNumber: string;
@@ -14,60 +16,107 @@ interface Props {
 
 function SignalJoin({ link }: { link: string }) {
   return (
-    <div className="flex flex-col items-center space-y-3">
-      <QRCodeSVG value={link} size={200} level="M" />
-      <a href={link} className="px-6 py-3 bg-blue-600 text-white rounded-lg font-bold">
+    <div className="card p-6 flex flex-col items-center gap-4">
+      <div className="eyebrow !text-[var(--color-muted)]">Group chat</div>
+      <div className="p-2 bg-[var(--color-paper)]">
+        <QRCodeSVG value={link} size={184} level="M" fgColor="#19170f" bgColor="transparent" />
+      </div>
+      <a href={link} className="btn-primary w-full">
         Join Signal Group
       </a>
-      <p className="text-xs text-gray-400">Scan QR code or tap the button</p>
+      <p className="text-xs font-mono tracking-wider text-[var(--color-muted)] uppercase">
+        Scan or tap
+      </p>
     </div>
   );
 }
 
 export default function CanvasserView({ assignment, signalLink }: Props) {
+  const [copied, setCopied] = useState(false);
+
   if (!assignment) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 space-y-6">
-        <div className="text-center">
-          <div className="text-4xl mb-4 animate-pulse">&#9203;</div>
-          <p className="text-xl text-gray-600">Waiting for assignment...</p>
-          <p className="text-sm text-gray-400 mt-2">Your organizer is setting up groups</p>
+      <AppShell>
+        <div className="mx-auto w-full max-w-md px-6 py-16 sm:py-24 space-y-10">
+          <header className="space-y-2 lift-in">
+            <div className="eyebrow">Standing by</div>
+            <h1 className="font-display text-[clamp(44px,7vw,64px)] leading-[0.95] tracking-[-0.01em]">
+              Waiting for assignment…
+            </h1>
+            <p className="text-[var(--color-ink-soft)]">
+              Your organizer is sorting groups. This page will update
+              automatically.
+            </p>
+          </header>
+
+          <div className="card p-6 flex items-center gap-4 lift-in delay-2">
+            <span className="inline-block h-3 w-3 rounded-full bg-[var(--color-signal)] animate-pulse" />
+            <div>
+              <div className="font-mono text-xs uppercase tracking-widest text-[var(--color-muted)]">
+                Status
+              </div>
+              <div className="text-sm">Connected — listening for updates</div>
+            </div>
+          </div>
+
+          {signalLink && <div className="lift-in delay-3"><SignalJoin link={signalLink} /></div>}
         </div>
-        {signalLink && <SignalJoin link={signalLink} />}
-      </div>
+      </AppShell>
     );
   }
 
+  async function handleCopy() {
+    await navigator.clipboard.writeText(assignment!.listNumber);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 space-y-6">
-      <div className="text-center">
-        <p className="text-sm text-gray-500 uppercase tracking-wide">Your list number</p>
-        <p className="text-6xl font-bold text-blue-600 mt-2">{assignment.listNumber}</p>
-        <button
-          onClick={() => navigator.clipboard.writeText(assignment.listNumber)}
-          className="mt-3 px-4 py-2 bg-gray-100 rounded-lg text-sm"
-        >
-          Copy to clipboard
-        </button>
-      </div>
+    <AppShell>
+      <div className="mx-auto w-full max-w-md px-6 py-10 sm:py-16 space-y-8">
+        <section className="space-y-3 lift-in">
+          <div className="eyebrow">Your list number</div>
+          <div className="card p-6 text-center space-y-4">
+            <div
+              className="font-display text-[clamp(72px,18vw,128px)] leading-none tracking-tight"
+              style={{ fontVariationSettings: '"opsz" 144, "SOFT" 20, "WONK" 1' }}
+            >
+              {assignment.listNumber}
+            </div>
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="btn-secondary w-full"
+            >
+              {copied ? 'Copied ✓' : 'Copy to clipboard'}
+            </button>
+          </div>
+        </section>
 
-      <div className="text-center">
-        <p className="font-bold text-lg">
-          {assignment.groupName}
-          {assignment.isLead && (
-            <span className="inline-block ml-2 px-2 py-0.5 text-xs bg-amber-100 text-amber-800 rounded-full">
-              Group lead
-            </span>
-          )}
-        </p>
-        <div className="mt-2 space-y-1">
-          {assignment.members.map((m) => (
-            <p key={m} className="text-gray-600">{m}</p>
-          ))}
-        </div>
-      </div>
+        <section className="space-y-3 lift-in delay-2">
+          <div className="eyebrow !text-[var(--color-ink-soft)]">Your group</div>
+          <div className="card p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="font-display text-2xl tracking-tight">
+                {assignment.groupName}
+              </div>
+              {assignment.isLead && (
+                <span className="chip chip-mark">Group lead</span>
+              )}
+            </div>
+            <ul className="font-mono text-sm space-y-1">
+              {assignment.members.map((m) => (
+                <li key={m} className="flex items-center gap-2">
+                  <span className="text-[var(--color-muted)]">·</span>
+                  <span>{m}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
 
-      {signalLink && <SignalJoin link={signalLink} />}
-    </div>
+        {signalLink && <div className="lift-in delay-3"><SignalJoin link={signalLink} /></div>}
+      </div>
+    </AppShell>
   );
 }
